@@ -7,7 +7,6 @@ class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    # KICK COMMAND
     @app_commands.command(name="kick", description="Kick a member from the server.")
     @app_commands.checks.has_permissions(kick_members=True)
     @app_commands.describe(user="User to kick", reason="Reason for kick")
@@ -21,7 +20,10 @@ class Moderation(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"⚠️ An unexpected error occurred: `{e}`")
 
-    # BAN COMMAND
+    @kick.error
+    async def kick_error(self, interaction: discord.Interaction, error):
+        await interaction.response.send_message("❌ You need `Kick Members` permission to use this command.", ephemeral=True)
+
     @app_commands.command(name="ban", description="Ban a member from the server.")
     @app_commands.checks.has_permissions(ban_members=True)
     @app_commands.describe(user="User to ban", reason="Reason for ban")
@@ -35,7 +37,10 @@ class Moderation(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"⚠️ An unexpected error occurred: `{e}`")
 
-    # UNBAN COMMAND
+    @ban.error
+    async def ban_error(self, interaction: discord.Interaction, error):
+        await interaction.response.send_message("❌ You need `Ban Members` permission to use this command.", ephemeral=True)
+
     @app_commands.command(name="unban", description="Unban a previously banned user.")
     @app_commands.checks.has_permissions(ban_members=True)
     @app_commands.describe(user_id="The ID of the user to unban")
@@ -52,7 +57,10 @@ class Moderation(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"⚠️ An unexpected error occurred: `{e}`")
 
-    # TIMEOUT COMMAND
+    @unban.error
+    async def unban_error(self, interaction: discord.Interaction, error):
+        await interaction.response.send_message("❌ You need `Ban Members` permission to use this command.", ephemeral=True)
+
     @app_commands.command(name="timeout", description="Timeout a member.")
     @app_commands.checks.has_permissions(moderate_members=True)
     @app_commands.describe(user="User to timeout", duration="Timeout duration in minutes", reason="Reason for timeout")
@@ -66,7 +74,10 @@ class Moderation(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"⚠️ An unexpected error occurred: `{e}`")
 
-    # UNTIMEOUT COMMAND
+    @timeout.error
+    async def timeout_error(self, interaction: discord.Interaction, error):
+        await interaction.response.send_message("❌ You need `Moderate Members` permission to use this command.", ephemeral=True)
+
     @app_commands.command(name="untimeout", description="Remove timeout from a member.")
     @app_commands.checks.has_permissions(moderate_members=True)
     @app_commands.describe(user="User to remove timeout")
@@ -80,23 +91,9 @@ class Moderation(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"⚠️ An unexpected error occurred: `{e}`")
 
-    # ERROR HANDLER FOR SLASH COMMANDS
-    @commands.Cog.listener()
-    async def on_app_command_error(self, interaction: discord.Interaction, error):
-        try:
-            if interaction.response.is_done():
-                send = interaction.followup.send
-            else:
-                send = interaction.response.send_message
-
-            if isinstance(error, app_commands.errors.MissingPermissions):
-                await send("❌ You don't have the required permissions to use this command.", ephemeral=True)
-            elif isinstance(error, discord.Forbidden):
-                await send("❌ I don’t have enough permissions to do that.", ephemeral=True)
-            else:
-                await send(f"⚠️ An unexpected error occurred: `{error}`", ephemeral=True)
-        except Exception as e:
-            print(f"[Moderation Command Error] {e}")
+    @untimeout.error
+    async def untimeout_error(self, interaction: discord.Interaction, error):
+        await interaction.response.send_message("❌ You need `Moderate Members` permission to use this command.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Moderation(bot))
