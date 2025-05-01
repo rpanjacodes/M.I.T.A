@@ -19,9 +19,9 @@ class VCMove(commands.Cog):
             await member.move_to(target_channel)
             await interaction.response.send_message(f"Moved {member.display_name} to {target_channel.name}.", ephemeral=True)
         except discord.Forbidden:
-            await interaction.response.send_message("I don't have permission to move that member.", ephemeral=True)
+            await interaction.response.send_message("❌ I don't have permission to move that member.", ephemeral=True)
         except Exception as e:
-            await interaction.response.send_message(f"Error: {e}", ephemeral=True)
+            await interaction.response.send_message(f"⚠️ An unexpected error occurred: {e}", ephemeral=True)
 
     @app_commands.command(name="move_all", description="Move all members from one VC to another.")
     @app_commands.checks.has_permissions(move_members=True)
@@ -29,11 +29,11 @@ class VCMove(commands.Cog):
                        from_channel: discord.VoiceChannel,
                        to_channel: discord.VoiceChannel):
         if from_channel.id == to_channel.id:
-            await interaction.response.send_message("Source and target channels are the same.", ephemeral=True)
+            await interaction.response.send_message("❌ Source and target channels are the same.", ephemeral=True)
             return
 
         if not from_channel.members:
-            await interaction.response.send_message("There are no members in the source VC.", ephemeral=True)
+            await interaction.response.send_message("❌ There are no members in the source VC.", ephemeral=True)
             return
 
         failed = []
@@ -45,10 +45,22 @@ class VCMove(commands.Cog):
 
         if failed:
             await interaction.response.send_message(
-                f"Moved others, but failed to move: {', '.join(failed)}", ephemeral=True)
+                f"⚠️ Moved others, but failed to move: {', '.join(failed)}", ephemeral=True)
         else:
             await interaction.response.send_message(
-                f"Moved all members from {from_channel.name} to {to_channel.name}.", ephemeral=True)
+                f"✅ Moved all members from {from_channel.name} to {to_channel.name}.", ephemeral=True)
+
+    # Custom error handler
+    @move_user.error
+    @move_all.error
+    async def on_command_error(self, interaction: discord.Interaction, error):
+        if isinstance(error, app_commands.MissingPermissions):
+            await interaction.response.send_message("❌ You need the `Move Members` permission to use this command.", ephemeral=True)
+        elif isinstance(error, discord.Forbidden):
+            await interaction.response.send_message("❌ I don't have enough permissions to perform that action.", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"⚠️ An unexpected error occurred: {error}", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(VCMove(bot))
+
