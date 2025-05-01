@@ -13,15 +13,15 @@ class AutoMod(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        anti_invite, anti_link, anti_spam = get_automod_settings(message.guild.id)
-        content = message.content.lower()
-
         try:
+            anti_invite, anti_link, anti_spam = get_automod_settings(message.guild.id)
+            content = message.content.lower()
+
             if anti_invite and re.search(r"(?:https?:\/\/)?(?:www\.)?(discord\.gg|discord\.com\/invite)\/[a-zA-Z0-9]+", content):
                 await message.delete()
                 return
 
-            if anti_link and re.search(r"https?://", content):
+            if anti_link and re.search(r"https?:\/\/\S+", content):
                 await message.delete()
                 return
 
@@ -30,7 +30,12 @@ class AutoMod(commands.Cog):
                 return
 
         except discord.Forbidden:
-            pass  # No permission to delete
+            # Bot lacks permission to delete messages
+            channel = message.channel
+            try:
+                await channel.send("❌ I don't have permission to delete messages. Please check my permissions.", delete_after=5)
+            except:
+                pass  # Can't even send error
         except Exception as e:
             print(f"[AutoMod Error] {e}")
 
@@ -61,6 +66,26 @@ class AutoMod(commands.Cog):
         new_val = 0 if current[index] else 1
         set_automod_setting(guild_id, key, new_val)
         return new_val
+
+    # ===== Error Handler for Slash Commands =====
+
+    @commands.Cog.listener()
+    async def on_app_command_error(self, interaction: discord.Interaction, error):
+        if isinstance(error, app_commands.errors.MissingPermissions):
+            await interaction.response.send_message(
+                "❌ You need the **Manage Server** permission to use this command.",
+                ephemeral=True
+            )
+        elif isinstance(error, discord.Forbidden):
+            await interaction.response.send_message(
+                "❌ I don't have the required permissions to perform this action.",
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                f"⚠️ An unexpected error occurred: `{error}`",
+                ephemeral=True
+            )
 
 async def setup(bot):
     await bot.add_cog(AutoMod(bot))
