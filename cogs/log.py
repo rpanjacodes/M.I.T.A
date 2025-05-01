@@ -7,6 +7,7 @@ class Logs(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    # Member banned log
     @commands.Cog.listener()
     async def on_member_ban(self, guild, user):
         if is_log_enabled(guild.id):
@@ -15,7 +16,7 @@ class Logs(commands.Cog):
             if channel:
                 embed = discord.Embed(
                     title="🚫 Member Banned",
-                    description=f"**{user.name}#{user.discriminator}**",
+                    description=f"**{user}**",
                     color=discord.Color.red()
                 )
                 embed.set_footer(text=f"User ID: {user.id}")
@@ -24,6 +25,7 @@ class Logs(commands.Cog):
                 except discord.Forbidden:
                     pass
 
+    # Member left/kicked log
     @commands.Cog.listener()
     async def on_member_remove(self, member):
         if is_log_enabled(member.guild.id):
@@ -32,7 +34,7 @@ class Logs(commands.Cog):
             if channel:
                 embed = discord.Embed(
                     title="👋 Member Left or Kicked",
-                    description=f"**{member.name}#{member.discriminator}**",
+                    description=f"**{member}**",
                     color=discord.Color.orange()
                 )
                 embed.set_footer(text=f"User ID: {member.id}")
@@ -41,6 +43,7 @@ class Logs(commands.Cog):
                 except discord.Forbidden:
                     pass
 
+    # Set log channel
     @app_commands.command(name="set_log_channel", description="Set the channel where logs will be posted.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def set_log_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
@@ -50,6 +53,14 @@ class Logs(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"⚠️ Something went wrong: `{e}`", ephemeral=True)
 
+    @set_log_channel.error
+    async def set_log_channel_error(self, interaction: discord.Interaction, error):
+        if isinstance(error, app_commands.errors.MissingPermissions):
+            await interaction.response.send_message("❌ You need `Manage Server` permission to use this command.", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"⚠️ Error: `{error}`", ephemeral=True)
+
+    # Toggle logging
     @app_commands.command(name="toggle_logs", description="Enable or disable log messages.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def toggle_logs(self, interaction: discord.Interaction, enabled: bool):
@@ -60,23 +71,12 @@ class Logs(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"⚠️ Something went wrong: `{e}`", ephemeral=True)
 
-    @commands.Cog.listener()
-    async def on_app_command_error(self, interaction: discord.Interaction, error):
+    @toggle_logs.error
+    async def toggle_logs_error(self, interaction: discord.Interaction, error):
         if isinstance(error, app_commands.errors.MissingPermissions):
-            await interaction.response.send_message(
-                "❌ You need the **Manage Server** permission to use this command.",
-                ephemeral=True
-            )
-        elif isinstance(error, discord.Forbidden):
-            await interaction.response.send_message(
-                "❌ I don't have permission to do that. Please check my role permissions.",
-                ephemeral=True
-            )
+            await interaction.response.send_message("❌ You need `Manage Server` permission to use this command.", ephemeral=True)
         else:
-            await interaction.response.send_message(
-                f"⚠️ An unexpected error occurred: `{error}`",
-                ephemeral=True
-            )
+            await interaction.response.send_message(f"⚠️ Error: `{error}`", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Logs(bot))
