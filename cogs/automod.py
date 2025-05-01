@@ -13,12 +13,14 @@ class AutoMod(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        # Avoid errors if bot lacks permissions
-        if not message.guild.me.guild_permissions.manage_messages:
+        # Ensure bot can manage messages
+        me = message.guild.me
+        if not me or not me.guild_permissions.manage_messages:
             return
 
         try:
-            anti_invite, anti_link, anti_spam = get_automod_settings(message.guild.id) or (0, 0, 0)
+            settings = get_automod_settings(message.guild.id)
+            anti_invite, anti_link, anti_spam = settings if settings else (0, 0, 0)
             content = message.content.lower()
 
             if anti_invite and re.search(r"(?:https?:\/\/)?(?:www\.)?(discord\.gg|discord\.com\/invite)\/[a-zA-Z0-9]+", content):
@@ -48,19 +50,32 @@ class AutoMod(commands.Cog):
     async def toggle_anti_invite(self, interaction: discord.Interaction):
         await self._handle_toggle(interaction, "anti_invite", "Anti-invite")
 
+    @toggle_anti_invite.error
+    async def toggle_anti_invite_error(self, interaction: discord.Interaction, error):
+        await self._handle_error(interaction, error)
+
     @app_commands.command(name="toggle_anti_link", description="Toggle the anti-link filter.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def toggle_anti_link(self, interaction: discord.Interaction):
         await self._handle_toggle(interaction, "anti_link", "Anti-link")
+
+    @toggle_anti_link.error
+    async def toggle_anti_link_error(self, interaction: discord.Interaction, error):
+        await self._handle_error(interaction, error)
 
     @app_commands.command(name="toggle_anti_spam", description="Toggle the anti-spam (capslock) filter.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def toggle_anti_spam(self, interaction: discord.Interaction):
         await self._handle_toggle(interaction, "anti_spam", "Anti-spam")
 
+    @toggle_anti_spam.error
+    async def toggle_anti_spam_error(self, interaction: discord.Interaction, error):
+        await self._handle_error(interaction, error)
+
     async def _handle_toggle(self, interaction: discord.Interaction, key: str, label: str):
         try:
-            current = get_automod_settings(interaction.guild.id) or (0, 0, 0)
+            settings = get_automod_settings(interaction.guild.id)
+            current = list(settings) if settings else [0, 0, 0]
             index = {"anti_invite": 0, "anti_link": 1, "anti_spam": 2}[key]
             new_val = 0 if current[index] else 1
             set_automod_setting(interaction.guild.id, key, new_val)
@@ -69,17 +84,11 @@ class AutoMod(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"⚠️ Something went wrong: `{e}`", ephemeral=True)
 
-    # ===== Error Handler =====
-
-    @commands.Cog.listener()
-    async def on_app_command_error(self, interaction: discord.Interaction, error):
+    async def _handle_error(self, interaction: discord.Interaction, error):
         try:
             send = interaction.followup.send if interaction.response.is_done() else interaction.response.send_message
-
             if isinstance(error, app_commands.errors.MissingPermissions):
                 await send("❌ You need the **Manage Server** permission to use this command.", ephemeral=True)
-            elif isinstance(error, discord.Forbidden):
-                await send("❌ I don't have the required permissions to perform this action.", ephemeral=True)
             else:
                 await send(f"⚠️ An unexpected error occurred: `{error}`", ephemeral=True)
         except Exception as e:
