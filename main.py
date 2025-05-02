@@ -17,18 +17,32 @@ intents.voice_states = True
 # Create the bot
 bot = commands.Bot(command_prefix=None, intents=intents)
 
-# Help Slash Command
-@bot.tree.command(name="help", description="Shows the bot help menu.")
-async def help_command(interaction: discord.Interaction):
-    embed = discord.Embed(title="Bot Help Menu", color=discord.Color.blurple())
-    embed.add_field(name="/pinbotmessage", value="Keep a message always at the bottom.", inline=False)
-    embed.add_field(name="/nicknameformat", value="Set a custom nickname format like `FS | {username}`.", inline=False)
-    embed.add_field(name="/moveall", value="Move all members from one VC to another.", inline=False)
-    embed.set_footer(text="Use slash commands for best experience and Many Cmds not Listed Here.")
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1359128965444272324/1367226585886883900/Screenshot_2025-04-30-22-29-26-046_com.HoYoverse.Nap.jpg")
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+# When the bot joins a new guild
+@bot.event
+async def on_guild_join(guild: discord.Guild):
+    embed = discord.Embed(
+        title="Thanks for adding me!",
+        description=(
+            "I'm **Sarah** – your all-in-one moderation, anime, utility, and customization assistant.\n\n"
+            "Use `/help` to explore my features.\n"
+            "Need setup help? Configure nickname format, logging, anime alerts, and more!\n\n"
+            "**Get started with `/setlogchannel`, `/nicknameformat`, and `/setanimeupdates`.**"
+        ),
+        color=discord.Color.blurple()
+    )
+    embed.set_footer(text="Feel free to ask for help anytime!")
 
-# When bot is ready
+    # Try system channel first
+    if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
+        await guild.system_channel.send(embed=embed)
+    else:
+        # Fallback: first text channel where bot can send messages
+        for channel in guild.text_channels:
+            if channel.permissions_for(guild.me).send_messages:
+                await channel.send(embed=embed)
+                break
+
+# When the bot is ready
 @bot.event
 async def on_ready():
     await bot.change_presence(
@@ -42,7 +56,7 @@ async def on_ready():
     except Exception as e:
         print(f"Failed to sync commands: {e}")
 
-# Load cogs from /cogs folder
+# Load all cogs from the /cogs folder
 async def load_cogs():
     for filename in os.listdir('./cogs'):
         if filename.endswith('.py'):
@@ -52,11 +66,11 @@ async def load_cogs():
             except Exception as e:
                 print(f"Failed to load {filename}: {e}")
 
-# Main bot run logic
+# Main function to start the bot
 async def main():
     async with bot:
         await load_cogs()
-        await bot.start("token_only")  # Replace with your bot token
+        await bot.start("bot_token")  # Replace with your real token
 
 # Run the bot
 asyncio.run(main())
