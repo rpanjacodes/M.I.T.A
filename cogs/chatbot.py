@@ -6,8 +6,9 @@ import aiohttp
 
 # --------------------- Config ---------------------
 
-SHAPES_API_KEY = "your_api_key_here"  # Put your API key directly here
-SHAPES_API_URL = "https://api.shapes.inc/v1/chat/completions"
+SHAPES_API_KEY = "shapes_api"  # Put your API key directly here
+SHAPES_API_URL = "https://api.shapes.inc/v1/chat/completions"  # Correct endpoint
+SHAPES_MODEL = "shapesinc/milarussianmita"  # <-- Replace with your actual shape username
 DB_PATH = "bot.db"
 
 # --------------------- Database Utils ---------------------
@@ -86,7 +87,7 @@ class ChatbotCog(commands.Cog):
         }
 
         json_data = {
-            "model": "shapes-small-alpha",
+            "model": SHAPES_MODEL,
             "messages": [{"role": "user", "content": message.content}]
         }
 
