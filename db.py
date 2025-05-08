@@ -50,6 +50,12 @@ def init_db():
             episode_id TEXT PRIMARY KEY
         )''')
 
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS chatbot_settings (
+            guild_id INTEGER PRIMARY KEY,
+            channel_id INTEGER
+        )''')
+
 # -------------------- Nickname Settings --------------------
 
 def get_nick_setting(guild_id):
@@ -121,8 +127,8 @@ def set_pin_message(guild_id, channel_id, message, message_id, enabled=True):
             c.execute('''
             INSERT INTO pin_messages (guild_id, channel_id, message, message_id, enabled)
             VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(guild_id, channel_id) DO UPDATE SET
-                message = excluded.message,
+            ON CONFLICT(guild_id, channel_id) DO UPDATE
+            SET message = excluded.message,
                 message_id = excluded.message_id,
                 enabled = excluded.enabled
             ''', (guild_id, channel_id, message, message_id, int(enabled)))
@@ -147,7 +153,8 @@ def set_pin_enabled(guild_id, channel_id, enabled):
             c.execute('''
             INSERT INTO pin_messages (guild_id, channel_id, enabled)
             VALUES (?, ?, ?)
-            ON CONFLICT(guild_id, channel_id) DO UPDATE SET enabled = excluded.enabled
+            ON CONFLICT(guild_id, channel_id) DO UPDATE
+            SET enabled = excluded.enabled
             ''', (guild_id, channel_id, int(enabled)))
     except sqlite3.Error as e:
         print(f"[DB] set_pin_enabled error: {e}")
@@ -226,9 +233,7 @@ def set_anime_schedule_settings(guild_id, channel_id, mode='instant'):
             c.execute('''
             INSERT INTO anime_schedule (guild_id, channel_id, mode)
             VALUES (?, ?, ?)
-            ON CONFLICT(guild_id) DO UPDATE SET
-                channel_id = excluded.channel_id,
-                mode = excluded.mode
+            ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id, mode = excluded.mode
             ''', (guild_id, channel_id, mode))
     except sqlite3.Error as e:
         print(f"[DB] set_anime_schedule_settings error: {e}")
@@ -261,3 +266,36 @@ def mark_episode_posted(episode_id):
             c.execute('INSERT OR IGNORE INTO posted_episodes (episode_id) VALUES (?)', (episode_id,))
     except sqlite3.Error as e:
         print(f"[DB] mark_episode_posted error: {e}")
+
+# -------------------- Chatbot Settings --------------------
+
+def set_chatbot_channel(guild_id, channel_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('''
+            INSERT INTO chatbot_settings (guild_id, channel_id)
+            VALUES (?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id
+            ''', (guild_id, channel_id))
+    except sqlite3.Error as e:
+        print(f"[DB] set_chatbot_channel error: {e}")
+
+def get_chatbot_channel(guild_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('SELECT channel_id FROM chatbot_settings WHERE guild_id = ?', (guild_id,))
+            row = c.fetchone()
+            return row[0] if row else None
+    except sqlite3.Error as e:
+        print(f"[DB] get_chatbot_channel error: {e}")
+        return None
+
+def remove_chatbot_channel(guild_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('DELETE FROM chatbot_settings WHERE guild_id = ?', (guild_id,))
+    except sqlite3.Error as e:
+        print(f"[DB] remove_chatbot_channel error: {e}")
