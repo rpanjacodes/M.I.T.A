@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from datetime import datetime
+from badge import get_badges  # Import badge function
 
 class UserInfo(commands.Cog):
     def __init__(self, bot):
@@ -29,6 +30,11 @@ class UserInfo(commands.Cog):
 
         embed.add_field(name="Created At", value=user.created_at.strftime("%Y-%m-%d %H:%M:%S"), inline=False)
         embed.add_field(name="Joined At", value=user.joined_at.strftime("%Y-%m-%d %H:%M:%S") if user.joined_at else "N/A", inline=False)
+
+        # Add custom badges if any
+        badges = get_badges(user.id)
+        if badges:
+            embed.add_field(name="Badges", value=" ".join(badges), inline=False)
 
         embed.set_footer(text=f"Requested by {interaction.user}", icon_url=interaction.user.avatar.url if interaction.user.avatar else None)
 
