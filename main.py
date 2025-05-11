@@ -1,3 +1,4 @@
+#main.py
 # M.I.T.A - Discord Bot Project
 # Copyright (C) 2025 M.I.T.A Bot Team
 # 
