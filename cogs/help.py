@@ -1,20 +1,3 @@
-# M.I.T.A - Discord Bot Project
-# Copyright (C) 2025 M.I.T.A Bot Team
-# 
-# This file is part of M.I.T.A.
-# 
-# M.I.T.A is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# M.I.T.A is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <https://www.gnu.org/licenses/>.
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -27,44 +10,78 @@ class HelpDropdown(discord.ui.View):
 class HelpSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label="Moderation", description="Ban, kick, timeout, etc."),
-            discord.SelectOption(label="Anime", description="Anime updates, test post, etc."),
-            discord.SelectOption(label="Utility", description="Embed command, server info, etc."),
-            discord.SelectOption(label="Setup", description="Configure logs, nickname format, etc."),
+            discord.SelectOption(label="Moderation", description="Here's Your All Mod Cmds.", emoji=discord.PartialEmoji(name="mod_hammer", id=1370395205697671218)),
+            discord.SelectOption(label="AI", description="Here's Your all AI Related Cmds.", emoji=discord.PartialEmoji(name="ai", id=1370395105676234883)),
+            discord.SelectOption(label="Automations", description="Here's Your all Automation Related Commamds.", emoji=discord.PartialEmoji(name="automation", id=1370395539727978547)),
+            discord.SelectOption(label="Information", description="Here's Your All Information Related Cmds.", emoji=discord.PartialEmoji(name="lu", id=1371214359107473469)),
+            discord.SelectOption(label="VC Commands", description="Here's Your all Vc Management Related Cmds.", emoji=discord.PartialEmoji(name="vc", id=1371211561053585448)),
+            discord.SelectOption(label="Decoration", description="Here's Your All Server Decoration Related Cmds.", emoji=discord.PartialEmoji(name="deco", id=1371211930399801454)),
+            discord.SelectOption(label="Automod", description="Here's Your All Automod Related Cmds.", emoji=discord.PartialEmoji(name="atmd", id=1371216174075088997)),
         ]
         super().__init__(placeholder="Choose a command category...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
         embed = discord.Embed(color=discord.Color.blurple())
+
         if self.values[0] == "Moderation":
             embed.title = "Moderation Commands"
             embed.description = (
-                "`/ban` - Ban a user\n"
-                "`/kick` - Kick a user\n"
-                "`/timeout` - Timeout a user\n"
-                "`/move` - Move a user to a voice channel\n"
-                "`/moveall` - Move all users to a VC"
+                "<:ff:1371144418387693731> `/ban` - Ban a user\n"
+                "<:ff:1371144418387693731> `/kick` - Kick a user\n"
+                "<:ff:1371144418387693731> `/timeout` - Timeout a user\n"
+                "<:ff:1371144418387693731> `/unban` - Unban the user\n"
+                "<:ff:1371144418387693731> `/untimeout` - Untimeout the user\n"
             )
-        elif self.values[0] == "Anime":
-            embed.title = "Anime Commands"
+
+        elif self.values[0] == "AI":
+            embed.title = "AI Commands"
             embed.description = (
-                "`/setanimeupdates` - Set channel for anime updates\n"
-                "`/removeanimeupdates` - Disable anime updates\n"
-                "`/testanimepost` - Send a test anime embed"
+                "<:ff:1371144418387693731> `/set_chatbot #channel` - To set the chatbot on a channel.\n"
+                "<:ff:1371144418387693731> `/disable_chatbot` - Disable the chatbot.\n"
             )
-        elif self.values[0] == "Utility":
-            embed.title = "Utility Commands"
+
+        elif self.values[0] == "Automations":
+            embed.title = "Automations"
             embed.description = (
-                "`/embed` - Send a custom embed\n"
-                "`/serverinfo` - Server information\n"
-                "`/userinfo` - Information about a user"
+                "<:ff:1371144418387693731> `/set_nickformat` - Changes nick when a new member joins.\n"
+                "<:ff:1371144418387693731> `/regular_role` - Assigns a role to new members.\n"
+                "<:ff:1371144418387693731> `/toogle_nickname` - Toggle nickname feature.\n"
+                "<:ff:1371144418387693731> `/toogle_regular-role` - Toggle regular role feature.\n"
+                "<:ff:1371144418387693731> `/set_log` - Set log channel.\n"
+                "<:ff:1371144418387693731> `/toogle_logs` - Toggle log feature."
             )
-        elif self.values[0] == "Setup":
-            embed.title = "Setup Commands"
+
+        elif self.values[0] == "Information":
+            embed.title = "Information"
             embed.description = (
-                "`/setlogchannel` - Set log channel\n"
-                "`/setnickformat` - Set auto nickname format\n"
-                "`/setautomod` - Configure automod"
+                "<:ff:1371144418387693731> `/user_info` - Shows user info.\n"
+                "<:ff:1371144418387693731> `/serverinfo` - Shows server info.\n"
+            )
+
+        elif self.values[0] == "VC Commands":
+            embed.title = "VC Commands"
+            embed.description = (
+                "<:ff:1371144418387693731> `/vc_unban` - Unban a member from VC.\n"
+                "<:ff:1371144418387693731> `/vc_ban` - Ban a member from VC.\n"
+                "<:ff:1371144418387693731> `/vc_kick` - Kick a member from VC.\n"
+                "<:ff:1371144418387693731> `/move_user` - Move a user between VCs.\n"
+                "<:ff:1371144418387693731> `/move_all` - Move all VC members to another VC.\n"
+            )
+
+        elif self.values[0] == "Decoration":
+            embed.title = "Decoration"
+            embed.description = (
+                "<:ff:1371144418387693731> `/bottom_pin` - A Message Can Set On channel and won't Disappear.\n"
+                "<:ff:1371144418387693731> `/toogle_bottom-pin` - Enables Or Disables The Sticky Text Feature.\n"
+                "<:ff:1371144418387693731> `/embed` - sends a customised embed message to a choosed channel.\n"
+            )
+
+        elif self.values[0] == "Automod":
+            embed.title = "Automod"
+            embed.description = (
+                "<:ff:1371144418387693731> `/toogle_anti-spam` - Toggle caps spam protection.\n"
+                "<:ff:1371144418387693731> `/toogle_anti-link` - Toggle link blocker.\n"
+                "<:ff:1371144418387693731> `/toogle_anti-invite` - Toggle invite blocker.\n"
             )
 
         await interaction.response.edit_message(embed=embed, view=self.view)
@@ -73,11 +90,11 @@ class HelpCommand(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="help", description="Show all bot commands by category using dropdown.")
+    @app_commands.command(name="help", description="Show all bot commands.")
     async def help_command(self, interaction: discord.Interaction):
         embed = discord.Embed(
-            title="Bot Help Menu",
-            description="Select a category from the dropdown below to view the available commands.",
+            title="<:ff:1371144418387693731> Bot Help Menu",
+            description="Please tap the dropdown menu to view each command category.",
             color=discord.Color.blurple()
         )
         await interaction.response.send_message(embed=embed, view=HelpDropdown(), ephemeral=False)
