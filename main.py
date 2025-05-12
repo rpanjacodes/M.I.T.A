@@ -39,16 +39,16 @@ bot = commands.Bot(command_prefix=None, intents=intents)
 @bot.event
 async def on_guild_join(guild: discord.Guild):
     embed = discord.Embed(
-        title="Thanks for adding me!",
+        title="<:kirtikaze_impressed:1360665116399636650> Thanks for adding me!",
         description=(
-            "I'm **Sarah** – your all-in-one moderation, anime, utility, and customization assistant.\n\n"
-            "Use `/help` to explore my features.\n"
-            "Need setup help? Configure nickname format, logging, anime alerts, and more!\n\n"
-            "**Get started with `/setlogchannel`, `/nicknameformat`, and `/setanimeupdates`.**"
+            "<:kirtikaze_hii:1360664781761151196> I'm **M.I.T.A** – I Have Many Useful Features That Many Bots Doesn't Have. \n\n"
+            "<a:arr:1371326929042407435> Use `/help` to explore my features.\n"
+            "<a:arr:1371326929042407435> I Can Talk To You ! Just Type ``/set_channel`` And I Am Ready \n\n"
+            "**Less Gooo !**"
         ),
         color=discord.Color.blurple()
     )
-    embed.set_footer(text="Feel free to ask for help anytime!")
+    embed.set_footer(text="(⁠☞⁠^⁠o⁠^⁠)⁠ ⁠☞ Made With ❤️ By Kirtikaze Team")
 
     # Try system channel first
     if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
@@ -65,7 +65,7 @@ async def on_guild_join(guild: discord.Guild):
 async def on_ready():
     await bot.change_presence(
         status=discord.Status.idle,
-        activity=discord.Game("With Your Fate")
+        activity=discord.Game("「 M.I.T.A For You ❤️ 」")
     )
     print(f"Logged in as {bot.user}")
     try:
@@ -88,7 +88,7 @@ async def load_cogs():
 async def main():
     async with bot:
         await load_cogs()
-        await bot.start("bot_token")  # Replace with your real token
+        await bot.start("MTM0MjE3MDI0ODAyMjk4Njg2Ng.GhBdE1.Ywwkw6pexA8U7g37hJC0cdpkVdYybu9SMOg-kQ")  # Replace with your real token
 
 # Run the bot
 asyncio.run(main())
