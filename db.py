@@ -1,20 +1,3 @@
-# M.I.T.A - Discord Bot Project
-# Copyright (C) 2025 M.I.T.A Bot Team
-# 
-# This file is part of M.I.T.A.
-# 
-# M.I.T.A is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# M.I.T.A is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <https://www.gnu.org/licenses/>.
 import sqlite3
 
 DB_PATH = 'bot.db'
@@ -71,6 +54,13 @@ def init_db():
         CREATE TABLE IF NOT EXISTS chatbot_settings (
             guild_id INTEGER PRIMARY KEY,
             channel_id INTEGER
+        )''')
+        
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS regular_role (
+            guild_id INTEGER PRIMARY KEY,
+            role_id INTEGER,
+            enabled INTEGER DEFAULT 0
         )''')
 
 # -------------------- Nickname Settings --------------------
@@ -241,6 +231,49 @@ def is_log_enabled(guild_id):
         print(f"[DB] is_log_enabled error: {e}")
         return False
 
+# -------------------- Anime Schedule Settings --------------------
+
+def set_anime_schedule_settings(guild_id, channel_id, mode='instant'):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('''
+            INSERT INTO anime_schedule (guild_id, channel_id, mode)
+            VALUES (?, ?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id, mode = excluded.mode
+            ''', (guild_id, channel_id, mode))
+    except sqlite3.Error as e:
+        print(f"[DB] set_anime_schedule_settings error: {e}")
+
+def get_anime_schedule_settings(guild_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('SELECT channel_id, mode FROM anime_schedule WHERE guild_id = ?', (guild_id,))
+            row = c.fetchone()
+            return row if row else (None, 'instant')
+    except sqlite3.Error as e:
+        print(f"[DB] get_anime_schedule_settings error: {e}")
+        return (None, 'instant')
+
+def has_posted_episode(episode_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('SELECT 1 FROM posted_episodes WHERE episode_id = ?', (episode_id,))
+            return c.fetchone() is not None
+    except sqlite3.Error as e:
+        print(f"[DB] has_posted_episode error: {e}")
+        return False
+
+def mark_episode_posted(episode_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('INSERT OR IGNORE INTO posted_episodes (episode_id) VALUES (?)', (episode_id,))
+    except sqlite3.Error as e:
+        print(f"[DB] mark_episode_posted error: {e}")
+
 # -------------------- Chatbot Settings --------------------
 
 def set_chatbot_channel(guild_id, channel_id):
@@ -273,3 +306,40 @@ def remove_chatbot_channel(guild_id):
             c.execute('DELETE FROM chatbot_settings WHERE guild_id = ?', (guild_id,))
     except sqlite3.Error as e:
         print(f"[DB] remove_chatbot_channel error: {e}")
+
+# -------------------- Regular Role --------------------
+
+def set_regular_role(guild_id, role_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('''
+                INSERT INTO regular_role (guild_id, role_id)
+                VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET role_id = excluded.role_id
+            ''', (guild_id, role_id))
+    except sqlite3.Error as e:
+        print(f"[DB] set_regular_role error: {e}")
+
+def toggle_regular_role(guild_id, enabled):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('''
+                INSERT INTO regular_role (guild_id, enabled)
+                VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET enabled = excluded.enabled
+            ''', (guild_id, int(enabled)))
+    except sqlite3.Error as e:
+        print(f"[DB] toggle_regular_role error: {e}")
+
+def get_regular_role_settings(guild_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('SELECT role_id, enabled FROM regular_role WHERE guild_id = ?', (guild_id,))
+            row = c.fetchone()
+            return row if row else (None, 0)
+    except sqlite3.Error as e:
+        print(f"[DB] get_regular_role_settings error: {e}")
+        return (None, 0)
