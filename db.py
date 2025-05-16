@@ -347,16 +347,6 @@ def store_giveaway(guild_id, message_id, channel_id, image_url, end_time, requir
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute('''
-                CREATE TABLE IF NOT EXISTS giveaways (
-                    guild_id INTEGER,
-                    message_id INTEGER,
-                    channel_id INTEGER,
-                    image_url TEXT,
-                    end_time REAL,
-                    required_role TEXT
-                )
-            ''')
-            c.execute('''
                 INSERT INTO giveaways (guild_id, message_id, channel_id, image_url, end_time, required_role)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (guild_id, message_id, channel_id, image_url, end_time, required_role))
