@@ -4,7 +4,7 @@ from discord import app_commands
 from datetime import datetime, timedelta
 import pytz
 import random
-import db  # your database handler module
+import db
 
 class Giveaway(commands.Cog):
     def __init__(self, bot):
@@ -19,6 +19,7 @@ class Giveaway(commands.Cog):
         duration="Duration in minutes",
         prize="What is the prize?",
         timezone="Your timezone (e.g., Europe/London, Asia/Kolkata)",
+        winners="Number of winners (default: 1)",
         image_url="Optional image URL",
         required_role="Role required to join (optional)"
     )
@@ -28,10 +29,10 @@ class Giveaway(commands.Cog):
         duration: int,
         prize: str,
         timezone: str,
+        winners: int = 1,
         image_url: str = None,
         required_role: discord.Role = None
     ):
-        # Permission check: Must have Manage Messages
         if not interaction.user.guild_permissions.manage_messages:
             await interaction.response.send_message(
                 "You need the **Manage Messages** permission to start a giveaway.",
@@ -39,25 +40,24 @@ class Giveaway(commands.Cog):
             )
             return
 
-        if duration <= 0:
-            await interaction.response.send_message("Duration must be greater than 0 minutes.", ephemeral=True)
+        if duration <= 0 or winners <= 0:
+            await interaction.response.send_message("Duration and winners must be greater than 0.", ephemeral=True)
             return
 
         try:
             tz = pytz.timezone(timezone)
         except pytz.UnknownTimeZoneError:
-            await interaction.response.send_message(
-                "Invalid timezone. Use names like `Europe/London` or `Asia/Kolkata`.",
-                ephemeral=True
-            )
+            await interaction.response.send_message("Invalid timezone format.", ephemeral=True)
             return
 
         end_time = datetime.now(pytz.utc) + timedelta(minutes=duration)
 
-        # Create embed
         embed = discord.Embed(
             title="🎉 Giveaway Started!",
-            description=f"**Prize:** {prize}\nEnds <t:{int(end_time.timestamp())}:R>\nReact with 🎉 to enter!",
+            description=f"**Prize:** {prize}\n"
+                        f"**Winners:** {winners}\n"
+                        f"Ends <t:{int(end_time.timestamp())}:R>\n"
+                        f"React with 🎉 to enter!",
             color=discord.Color.green()
         )
         if required_role:
@@ -67,12 +67,10 @@ class Giveaway(commands.Cog):
 
         embed.set_footer(text=f"Hosted by {interaction.user}", icon_url=interaction.user.display_avatar.url)
 
-        # Send message
         await interaction.response.send_message(embed=embed)
         message = await interaction.original_response()
         await message.add_reaction("🎉")
 
-        # Store in DB
         db.store_giveaway(
             guild_id=interaction.guild.id,
             message_id=message.id,
@@ -81,6 +79,58 @@ class Giveaway(commands.Cog):
             end_time=end_time.timestamp(),
             required_role=required_role.id if required_role else None
         )
+
+        message_id = message.id
+        self.bot.giveaway_winners = getattr(self.bot, "giveaway_winners", {})
+        self.bot.giveaway_winners[message_id] = winners
+
+    @app_commands.command(name="reroll", description="Reroll a giveaway by message ID.")
+    @app_commands.describe(message_id="The message ID of the giveaway to reroll")
+    async def reroll(self, interaction: discord.Interaction, message_id: int):
+        try:
+            await interaction.response.defer(thinking=True)
+            for row in db.get_active_giveaways():
+                if row[1] == message_id:
+                    await interaction.followup.send("This giveaway is still active and cannot be rerolled.")
+                    return
+
+            for guild in self.bot.guilds:
+                try:
+                    msg = None
+                    for ch in guild.text_channels:
+                        try:
+                            msg = await ch.fetch_message(message_id)
+                            if msg:
+                                break
+                        except:
+                            continue
+                    if not msg:
+                        continue
+
+                    reaction = discord.utils.get(msg.reactions, emoji="🎉")
+                    if not reaction:
+                        await interaction.followup.send("No valid 🎉 reaction found.")
+                        return
+
+                    users = await reaction.users().flatten()
+                    users = [u for u in users if not u.bot]
+
+                    if not users:
+                        await interaction.followup.send("No users to reroll.")
+                        return
+
+                    winners = self.bot.giveaway_winners.get(message_id, 1)
+                    chosen = random.sample(users, min(winners, len(users)))
+                    winner_mentions = ", ".join(w.mention for w in chosen)
+
+                    await interaction.followup.send(f"🎉 New winner(s): {winner_mentions}")
+                    return
+                except:
+                    continue
+
+            await interaction.followup.send("Giveaway message not found.")
+        except Exception as e:
+            await interaction.followup.send(f"Error during reroll: {e}")
 
     @tasks.loop(seconds=30)
     async def check_giveaways(self):
@@ -116,12 +166,10 @@ class Giveaway(commands.Cog):
 
             try:
                 users = await reaction.users().flatten()
-            except Exception as e:
-                print(f"[Giveaway] Error fetching users: {e}")
+                users = [u for u in users if not u.bot]
+            except:
                 db.remove_giveaway(guild_id, message_id)
                 continue
-
-            users = [u for u in users if not u.bot]
 
             if required_role_id:
                 role = guild.get_role(required_role_id)
@@ -130,14 +178,22 @@ class Giveaway(commands.Cog):
                     if (member := guild.get_member(u.id)) and role in member.roles
                 ]
 
+            winners_count = self.bot.giveaway_winners.get(message_id, 1)
             if users:
-                winner = random.choice(users)
-                embed = discord.Embed(
-                    title="🎉 Giveaway Ended!",
-                    description=f"Congrats {winner.mention}, you won **{message.embeds[0].description.splitlines()[0][9:]}**!",
-                    color=discord.Color.gold()
-                )
-                await channel.send(embed=embed)
+    selected = random.sample(users, min(winners_count, len(users)))
+    winner_mentions = ", ".join(u.mention for u in selected)
+
+    original_embed = message.embeds[0]
+    ended_embed = discord.Embed(
+        title="🎉 Giveaway Ended!",
+        description=f"Congrats {winner_mentions}, you won **{original_embed.description.splitlines()[0][9:]}**!",
+        color=discord.Color.gold()
+    )
+    ended_embed.set_footer(text=original_embed.footer.text, icon_url=original_embed.footer.icon_url)
+    if image_url:
+        ended_embed.set_image(url=image_url)
+
+    await message.edit(embed=ended_embed)
             else:
                 await channel.send("Nobody joined the giveaway.")
 
