@@ -52,15 +52,16 @@ def init_db():
         )''')
 
         c.execute('''
-        CREATE TABLE IF NOT EXISTS giveaways (
-            guild_id INTEGER,
-            message_id INTEGER,
-            channel_id INTEGER,
-            image_url TEXT,
-            end_time REAL,
-            required_role TEXT,
-            PRIMARY KEY (guild_id, message_id)
-        )''')
+    CREATE TABLE IF NOT EXISTS giveaways (
+        guild_id INTEGER,
+        message_id INTEGER,
+        channel_id INTEGER,
+        image_url TEXT,
+        end_time REAL,
+        required_role TEXT,
+        winner_count INTEGER,
+        PRIMARY KEY (guild_id, message_id)
+    )''')
 # -------------------- Nickname Settings --------------------
 
 def get_nick_setting(guild_id):
@@ -344,14 +345,14 @@ def get_regular_role_settings(guild_id):
     
     # -------------------- Giveaway Storage --------------------
 
-def store_giveaway(guild_id, message_id, channel_id, image_url, end_time, required_role=None):
+def store_giveaway(guild_id, message_id, channel_id, image_url, end_time, required_role=None, winner_count=1):
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute('''
-                INSERT INTO giveaways (guild_id, message_id, channel_id, image_url, end_time, required_role)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (guild_id, message_id, channel_id, image_url, end_time, required_role))
+                INSERT INTO giveaways (guild_id, message_id, channel_id, image_url, end_time, required_role, winner_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (guild_id, message_id, channel_id, image_url, end_time, required_role, winner_count))
     except sqlite3.Error as e:
         print(f"[DB] store_giveaway error: {e}")
 
@@ -360,7 +361,7 @@ def get_active_giveaways():
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute('''
-                SELECT guild_id, message_id, channel_id, image_url, end_time, required_role FROM giveaways
+                SELECT guild_id, message_id, channel_id, image_url, end_time, required_role, winner_count FROM giveaways
             ''')
             return c.fetchall()
     except sqlite3.Error as e:
