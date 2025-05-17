@@ -33,9 +33,19 @@ class Giveaway(commands.Cog):
         image_url: str = None,
         required_role: discord.Role = None
     ):
+        # Check user permission
         if not interaction.user.guild_permissions.manage_messages:
             await interaction.response.send_message(
                 "You need the **Manage Messages** permission to start a giveaway.",
+                ephemeral=True
+            )
+            return
+
+        # Check bot permissions
+        perms = interaction.channel.permissions_for(interaction.guild.me)
+        if not perms.send_messages or not perms.embed_links or not perms.add_reactions:
+            await interaction.response.send_message(
+                "I need the following permissions in this channel: **Send Messages**, **Embed Links**, **Add Reactions**.",
                 ephemeral=True
             )
             return
@@ -69,7 +79,12 @@ class Giveaway(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
         message = await interaction.original_response()
-        await message.add_reaction("🎉")
+
+        try:
+            await message.add_reaction("🎉")
+        except discord.Forbidden:
+            await interaction.followup.send("I couldn't add the 🎉 reaction. Please check my permissions.", ephemeral=True)
+            return
 
         db.store_giveaway(
             guild_id=interaction.guild.id,
@@ -87,8 +102,16 @@ class Giveaway(commands.Cog):
     @app_commands.command(name="reroll", description="Reroll a giveaway by message ID.")
     @app_commands.describe(message_id="The message ID of the giveaway to reroll")
     async def reroll(self, interaction: discord.Interaction, message_id: int):
+        if not interaction.user.guild_permissions.manage_messages:
+            await interaction.response.send_message(
+                "You need the **Manage Messages** permission to reroll a giveaway.",
+                ephemeral=True
+            )
+            return
+
         try:
             await interaction.response.defer(thinking=True)
+
             for row in db.get_active_giveaways():
                 if row[1] == message_id:
                     await interaction.followup.send("This giveaway is still active and cannot be rerolled.")
@@ -98,6 +121,8 @@ class Giveaway(commands.Cog):
                 try:
                     msg = None
                     for ch in guild.text_channels:
+                        if not ch.permissions_for(guild.me).read_message_history:
+                            continue
                         try:
                             msg = await ch.fetch_message(message_id)
                             if msg:
@@ -149,13 +174,17 @@ class Giveaway(commands.Cog):
                 continue
 
             channel = guild.get_channel(channel_id)
-            if not channel:
+            if not channel or not channel.permissions_for(guild.me).read_message_history:
                 db.remove_giveaway(guild_id, message_id)
                 continue
 
             try:
                 message = await channel.fetch_message(message_id)
             except discord.NotFound:
+                db.remove_giveaway(guild_id, message_id)
+                continue
+
+            if not message.embeds:
                 db.remove_giveaway(guild_id, message_id)
                 continue
 
@@ -180,20 +209,23 @@ class Giveaway(commands.Cog):
 
             winners_count = self.bot.giveaway_winners.get(message_id, 1)
             if users:
-    selected = random.sample(users, min(winners_count, len(users)))
-    winner_mentions = ", ".join(u.mention for u in selected)
+                selected = random.sample(users, min(winners_count, len(users)))
+                winner_mentions = ", ".join(u.mention for u in selected)
 
-    original_embed = message.embeds[0]
-    ended_embed = discord.Embed(
-        title="🎉 Giveaway Ended!",
-        description=f"Congrats {winner_mentions}, you won **{original_embed.description.splitlines()[0][9:]}**!",
-        color=discord.Color.gold()
-    )
-    ended_embed.set_footer(text=original_embed.footer.text, icon_url=original_embed.footer.icon_url)
-    if image_url:
-        ended_embed.set_image(url=image_url)
+                original_embed = message.embeds[0]
+                ended_embed = discord.Embed(
+                    title="🎉 Giveaway Ended!",
+                    description=f"Congrats {winner_mentions}, you won **{original_embed.description.splitlines()[0][9:]}**!",
+                    color=discord.Color.gold()
+                )
+                ended_embed.set_footer(text=original_embed.footer.text, icon_url=original_embed.footer.icon_url)
+                if image_url:
+                    ended_embed.set_image(url=image_url)
 
-    await message.edit(embed=ended_embed)
+                try:
+                    await message.edit(embed=ended_embed)
+                except discord.Forbidden:
+                    await channel.send("I couldn't edit the giveaway message. Please check my permissions.")
             else:
                 await channel.send("Nobody joined the giveaway.")
 
