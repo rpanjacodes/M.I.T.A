@@ -76,6 +76,8 @@ class HelpSelect(discord.ui.Select):
                 "<a:arr:1371326929042407435> `/toogle_bottom-pin` - Enables Or Disables The Sticky Text Feature.\n"
                 "<a:arr:1371326929042407435> `/embed` - sends a customised embed message to a choosed channel.\n"
                 "<a:arr:1371326929042407435> `/clear_chat` - Clears Chat/embed messages/bot messages in one go.\n"
+                "<a:arr:1371326929042407435> `/giveaway` - Set Giveaway On Your Server.\n"
+                "<a:arr:1371326929042407435> `/reroll` - You Can Reroll The Winner If He/She Invalid For You !\n"
             )
 
         elif self.values[0] == "Automod":
