@@ -33,7 +33,6 @@ class Giveaway(commands.Cog):
         image_url: str = None,
         required_role: discord.Role = None
     ):
-        # Check user permission
         if not interaction.user.guild_permissions.manage_messages:
             await interaction.response.send_message(
                 "You need the **Manage Messages** permission to start a giveaway.",
@@ -41,7 +40,6 @@ class Giveaway(commands.Cog):
             )
             return
 
-        # Check bot permissions
         perms = interaction.channel.permissions_for(interaction.guild.me)
         if not perms.send_messages or not perms.embed_links or not perms.add_reactions:
             await interaction.response.send_message(
@@ -92,12 +90,9 @@ class Giveaway(commands.Cog):
             channel_id=message.channel.id,
             image_url=image_url,
             end_time=end_time.timestamp(),
-            required_role=required_role.id if required_role else None
+            required_role=required_role.id if required_role else None,
+            winner_count=winners
         )
-
-        message_id = message.id
-        self.bot.giveaway_winners = getattr(self.bot, "giveaway_winners", {})
-        self.bot.giveaway_winners[message_id] = winners
 
     @app_commands.command(name="reroll", description="Reroll a giveaway by message ID.")
     @app_commands.describe(message_id="The message ID of the giveaway to reroll")
@@ -144,7 +139,11 @@ class Giveaway(commands.Cog):
                         await interaction.followup.send("No users to reroll.")
                         return
 
-                    winners = self.bot.giveaway_winners.get(message_id, 1)
+                    winners = 1  # fallback
+                    for row in db.get_active_giveaways():
+                        if row[1] == message_id:
+                            winners = row[6]  # winner_count from DB
+
                     chosen = random.sample(users, min(winners, len(users)))
                     winner_mentions = ", ".join(w.mention for w in chosen)
 
@@ -163,7 +162,7 @@ class Giveaway(commands.Cog):
         now = datetime.now(pytz.utc).timestamp()
 
         for giveaway in giveaways:
-            guild_id, message_id, channel_id, image_url, end_time, required_role_id = giveaway
+            guild_id, message_id, channel_id, image_url, end_time, required_role_id, winner_count = giveaway
 
             if now < end_time:
                 continue
@@ -207,15 +206,17 @@ class Giveaway(commands.Cog):
                     if (member := guild.get_member(u.id)) and role in member.roles
                 ]
 
-            winners_count = self.bot.giveaway_winners.get(message_id, 1)
             if users:
-                selected = random.sample(users, min(winners_count, len(users)))
+                selected = random.sample(users, min(winner_count, len(users)))
                 winner_mentions = ", ".join(u.mention for u in selected)
 
                 original_embed = message.embeds[0]
+                prize_line = next((line for line in original_embed.description.splitlines() if "Prize:" in line), "")
+                prize = prize_line.replace("**Prize:**", "").strip()
+
                 ended_embed = discord.Embed(
                     title="🎉 Giveaway Ended!",
-                    description=f"Congrats {winner_mentions}, you won **{original_embed.description.splitlines()[0][9:]}**!",
+                    description=f"Congrats {winner_mentions}, you won **{prize}**!",
                     color=discord.Color.gold()
                 )
                 ended_embed.set_footer(text=original_embed.footer.text, icon_url=original_embed.footer.icon_url)
