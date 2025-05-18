@@ -10,6 +10,7 @@ class Giveaway(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.check_giveaways.start()
+        self.bot.giveaway_winners = {}
 
     def cog_unload(self):
         self.check_giveaways.cancel()
@@ -43,7 +44,7 @@ class Giveaway(commands.Cog):
         perms = interaction.channel.permissions_for(interaction.guild.me)
         if not perms.send_messages or not perms.embed_links or not perms.add_reactions:
             await interaction.response.send_message(
-                "I need the following permissions in this channel: **Send Messages**, **Embed Links**, **Add Reactions**.",
+                "I need the following permissions: **Send Messages**, **Embed Links**, **Add Reactions**.",
                 ephemeral=True
             )
             return
@@ -77,12 +78,7 @@ class Giveaway(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
         message = await interaction.original_response()
-
-        try:
-            await message.add_reaction("🎉")
-        except discord.Forbidden:
-            await interaction.followup.send("I couldn't add the 🎉 reaction. Please check my permissions.", ephemeral=True)
-            return
+        await message.add_reaction("🎉")
 
         db.store_giveaway(
             guild_id=interaction.guild.id,
@@ -90,9 +86,10 @@ class Giveaway(commands.Cog):
             channel_id=message.channel.id,
             image_url=image_url,
             end_time=end_time.timestamp(),
-            required_role=required_role.id if required_role else None,
-            winner_count=winners
+            required_role=required_role.id if required_role else None
         )
+
+        self.bot.giveaway_winners[message.id] = winners
 
     @app_commands.command(name="reroll", description="Reroll a giveaway by message ID.")
     @app_commands.describe(message_id="The message ID of the giveaway to reroll")
@@ -104,33 +101,25 @@ class Giveaway(commands.Cog):
             )
             return
 
-        try:
-            await interaction.response.defer(thinking=True)
+        await interaction.response.defer(thinking=True)
 
-            for row in db.get_active_giveaways():
-                if row[1] == message_id:
-                    await interaction.followup.send("This giveaway is still active and cannot be rerolled.")
-                    return
+        for row in db.get_active_giveaways():
+            if row[1] == message_id:
+                await interaction.followup.send("This giveaway is still active.")
+                return
 
-            for guild in self.bot.guilds:
+        for guild in self.bot.guilds:
+            for channel in guild.text_channels:
+                if not channel.permissions_for(guild.me).read_message_history:
+                    continue
                 try:
-                    msg = None
-                    for ch in guild.text_channels:
-                        if not ch.permissions_for(guild.me).read_message_history:
-                            continue
-                        try:
-                            msg = await ch.fetch_message(message_id)
-                            if msg:
-                                break
-                        except:
-                            continue
+                    msg = await channel.fetch_message(message_id)
                     if not msg:
                         continue
 
                     reaction = discord.utils.get(msg.reactions, emoji="🎉")
                     if not reaction:
-                        await interaction.followup.send("No valid 🎉 reaction found.")
-                        return
+                        continue
 
                     users = await reaction.users().flatten()
                     users = [u for u in users if not u.bot]
@@ -139,31 +128,21 @@ class Giveaway(commands.Cog):
                         await interaction.followup.send("No users to reroll.")
                         return
 
-                    winners = 1  # fallback
-                    for row in db.get_active_giveaways():
-                        if row[1] == message_id:
-                            winners = row[6]  # winner_count from DB
-
+                    winners = self.bot.giveaway_winners.get(message_id, 1)
                     chosen = random.sample(users, min(winners, len(users)))
-                    winner_mentions = ", ".join(w.mention for w in chosen)
-
-                    await interaction.followup.send(f"🎉 New winner(s): {winner_mentions}")
+                    await interaction.followup.send(f"🎉 New winner(s): {', '.join(u.mention for u in chosen)}")
                     return
                 except:
                     continue
 
-            await interaction.followup.send("Giveaway message not found.")
-        except Exception as e:
-            await interaction.followup.send(f"Error during reroll: {e}")
+        await interaction.followup.send("Giveaway message not found.")
 
     @tasks.loop(seconds=30)
     async def check_giveaways(self):
-        giveaways = db.get_active_giveaways()
         now = datetime.now(pytz.utc).timestamp()
+        giveaways = db.get_active_giveaways()
 
-        for giveaway in giveaways:
-            guild_id, message_id, channel_id, image_url, end_time, required_role_id, winner_count = giveaway
-
+        for guild_id, message_id, channel_id, image_url, end_time, required_role_id in giveaways:
             if now < end_time:
                 continue
 
@@ -183,10 +162,6 @@ class Giveaway(commands.Cog):
                 db.remove_giveaway(guild_id, message_id)
                 continue
 
-            if not message.embeds:
-                db.remove_giveaway(guild_id, message_id)
-                continue
-
             reaction = discord.utils.get(message.reactions, emoji="🎉")
             if not reaction:
                 db.remove_giveaway(guild_id, message_id)
@@ -201,34 +176,31 @@ class Giveaway(commands.Cog):
 
             if required_role_id:
                 role = guild.get_role(required_role_id)
-                users = [
-                    u for u in users
-                    if (member := guild.get_member(u.id)) and role in member.roles
-                ]
+                users = [u for u in users if role in getattr(guild.get_member(u.id), "roles", [])]
+
+            winners_count = self.bot.giveaway_winners.get(message_id, 1)
 
             if users:
-                selected = random.sample(users, min(winner_count, len(users)))
-                winner_mentions = ", ".join(u.mention for u in selected)
+                winners = random.sample(users, min(winners_count, len(users)))
+                mentions = ", ".join(u.mention for u in winners)
+                prize_line = message.embeds[0].description.splitlines()[0]
+                prize = prize_line.split("**")[1] if "**" in prize_line else "a prize"
 
-                original_embed = message.embeds[0]
-                prize_line = next((line for line in original_embed.description.splitlines() if "Prize:" in line), "")
-                prize = prize_line.replace("**Prize:**", "").strip()
-
-                ended_embed = discord.Embed(
+                embed = discord.Embed(
                     title="🎉 Giveaway Ended!",
-                    description=f"Congrats {winner_mentions}, you won **{prize}**!",
+                    description=f"Congrats {mentions}, you won **{prize}**!",
                     color=discord.Color.gold()
                 )
-                ended_embed.set_footer(text=original_embed.footer.text, icon_url=original_embed.footer.icon_url)
+                embed.set_footer(text=message.embeds[0].footer.text, icon_url=message.embeds[0].footer.icon_url)
                 if image_url:
-                    ended_embed.set_image(url=image_url)
+                    embed.set_image(url=image_url)
 
                 try:
-                    await message.edit(embed=ended_embed)
-                except discord.Forbidden:
-                    await channel.send("I couldn't edit the giveaway message. Please check my permissions.")
+                    await message.edit(embed=embed)
+                except:
+                    await channel.send(f"Giveaway ended! Winners: {mentions}")
             else:
-                await channel.send("Nobody joined the giveaway.")
+                await channel.send("Giveaway ended, but no one joined.")
 
             db.remove_giveaway(guild_id, message_id)
 
