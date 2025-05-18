@@ -362,7 +362,8 @@ def get_active_giveaways():
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute('''
-                SELECT guild_id, message_id, channel_id, image_url, end_time, required_role, winner_count FROM giveaways
+                SELECT guild_id, message_id, channel_id, image_url, end_time, required_role, winner_count
+                FROM giveaways
             ''')
             return c.fetchall()
     except sqlite3.Error as e:
