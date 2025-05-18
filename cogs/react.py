@@ -5,11 +5,13 @@ from discord.ext import commands
 import aiohttp
 import random
 
+# === Configure your Tenor API key here ===
+TENOR_API_KEY = "YOUR_TENOR_API_KEY"
+
 class React(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-        # Supported tags per API
         self.waifu_tags = [
             "smile", "hug", "wave", "highfive", "wink", "blush", "pat", "happy", "cry", "dance", "bonk", "handhold", "poke"
         ]
@@ -21,6 +23,8 @@ class React(commands.Cog):
             "kick", "kiss", "laugh", "pat", "poke", "pout", "sad", "shrug", "sleepy", "smile", "stare", "wave", "wink"
         ]
 
+        self.all_tags = sorted(set(self.waifu_tags + self.nekos_tags + self.hisoka_tags))
+
     async def fetch_image(self, tag: str):
         sources = [self.from_waifu_pics, self.from_nekos_best, self.from_hisoka17]
         random.shuffle(sources)
@@ -29,7 +33,8 @@ class React(commands.Cog):
             image_url = await source(tag)
             if image_url:
                 return image_url
-        return None
+
+        return await self.from_tenor(tag)
 
     async def from_waifu_pics(self, tag):
         if tag not in self.waifu_tags:
@@ -64,11 +69,34 @@ class React(commands.Cog):
         except:
             return None
 
+    async def from_tenor(self, tag):
+        if not TENOR_API_KEY:
+            return None
+        try:
+            async with aiohttp.ClientSession() as session:
+                params = {
+                    "q": tag,
+                    "key": TENOR_API_KEY,
+                    "limit": 1,
+                    "media_filter": "minimal",
+                    "contentfilter": "high"  # Safe filter to avoid NSFW
+                }
+                async with session.get("https://tenor.googleapis.com/v2/search", params=params) as resp:
+                    data = await resp.json()
+                    if data.get("results"):
+                        return data["results"][0]["media_formats"]["gif"]["url"]
+        except:
+            return None
+
     @app_commands.command(name="react", description="Send a random anime reaction (e.g. smile, hug, cry, etc.)")
     @app_commands.describe(
         tag="Reaction tag (e.g. smile, hug, cry, etc.)",
         user="User to mention (optional)"
     )
+    @app_commands.autocomplete(tag=lambda interaction, current: [
+        app_commands.Choice(name=tag, value=tag)
+        for tag in React.get_matching_tags(current)
+    ])
     async def react(self, interaction: discord.Interaction, tag: str, user: discord.User = None):
         await interaction.response.defer()
         image_url = await self.fetch_image(tag.lower())
@@ -84,6 +112,14 @@ class React(commands.Cog):
             await interaction.followup.send(embed=embed)
         else:
             await interaction.followup.send(f"Couldn't find any reaction image for the tag **{tag}**.", ephemeral=True)
+
+    @staticmethod
+    def get_matching_tags(current: str):
+        tags = [
+            "smile", "hug", "wave", "highfive", "wink", "blush", "pat", "happy", "cry", "dance", "bonk", "handhold", "poke",
+            "bite", "stare", "kick", "laugh", "baka", "bored", "cuddle", "facepalm", "kiss", "pout", "sad", "shrug", "sleepy"
+        ]
+        return [tag for tag in tags if current.lower() in tag.lower()][:25]
 
 async def setup(bot):
     await bot.add_cog(React(bot))
