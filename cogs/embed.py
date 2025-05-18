@@ -1,20 +1,21 @@
 # M.I.T.A - Discord Bot Project
 # Copyright (C) 2025 M.I.T.A Bot Team
-# 
+#
 # This file is part of M.I.T.A.
-# 
+#
 # M.I.T.A is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # M.I.T.A is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -27,7 +28,8 @@ class EmbedSay(commands.Cog):
     @app_commands.describe(
         title="Title of the embed",
         description="Description text of the embed",
-        image_url="Optional image URL to display"
+        image_url="Optional image URL to display",
+        footer="Optional footer text"
     )
     @app_commands.checks.has_permissions(manage_channels=True)
     async def embed(
@@ -35,19 +37,19 @@ class EmbedSay(commands.Cog):
         interaction: discord.Interaction,
         title: str,
         description: str,
-        image_url: str = None
+        image_url: str = None,
+        footer: str = None
     ):
         embed = discord.Embed(
             title=title,
             description=description,
             color=discord.Color.blue()
         )
-        embed.set_footer(
-            text=f"Sent by {interaction.user.display_name}",
-            icon_url=interaction.user.display_avatar.url
-        )
+
         if image_url:
             embed.set_image(url=image_url)
+        if footer:
+            embed.set_footer(text=footer)
 
         await interaction.channel.send(embed=embed)
         await interaction.response.send_message("Embed sent successfully.", ephemeral=True)
@@ -62,7 +64,7 @@ class EmbedSay(commands.Cog):
         else:
             await interaction.response.send_message(
                 "An unexpected error occurred while processing your embed.",
-                ephemeral=True=True
+                ephemeral=True
             )
 
 async def setup(bot):
