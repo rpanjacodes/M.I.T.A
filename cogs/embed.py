@@ -24,20 +24,30 @@ class EmbedSay(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="embed", description="Send a custom embedded message.")
-    @app_commands.describe(title="Title of the embed", description="Description text of the embed")
+    @app_commands.describe(
+        title="Title of the embed",
+        description="Description text of the embed",
+        image_url="Optional image URL to display"
+    )
     @app_commands.checks.has_permissions(manage_channels=True)
     async def embed(
         self,
         interaction: discord.Interaction,
         title: str,
-        description: str
+        description: str,
+        image_url: str = None
     ):
         embed = discord.Embed(
             title=title,
             description=description,
             color=discord.Color.blue()
         )
-        embed.set_footer(text=f"Sent by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
+        embed.set_footer(
+            text=f"Sent by {interaction.user.display_name}",
+            icon_url=interaction.user.display_avatar.url
+        )
+        if image_url:
+            embed.set_image(url=image_url)
 
         await interaction.channel.send(embed=embed)
         await interaction.response.send_message("Embed sent successfully.", ephemeral=True)
@@ -52,7 +62,7 @@ class EmbedSay(commands.Cog):
         else:
             await interaction.response.send_message(
                 "An unexpected error occurred while processing your embed.",
-                ephemeral=True
+                ephemeral=True=True
             )
 
 async def setup(bot):
