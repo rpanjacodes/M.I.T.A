@@ -17,6 +17,7 @@ class HelpSelect(discord.ui.Select):
             discord.SelectOption(label="VC Commands", description="Here's Your all Vc Management Related Cmds.", emoji=discord.PartialEmoji(name="kirtikaze_happy", id=1360663196838395986)),
             discord.SelectOption(label="Decoration", description="Here's Your All Server Decoration Related Cmds.", emoji=discord.PartialEmoji(name="kirtikaze_blushed", id=1360664907426562239)),
             discord.SelectOption(label="Automod", description="Here's Your All Automod Related Cmds.", emoji=discord.PartialEmoji(name="kirtikaze_teacher", id=1371362631306182676)),
+            discord.SelectOption(label="Fun and Enjoy", description="Here's Your All Fun And Enjoyable Cmds.", emoji=discord.PartialEmoji(name="kirtikaze_congratulate",id=1360663897211797666)),
         ]
         super().__init__(placeholder="Choose a command category...", min_values=1, max_values=1, options=options)
 
@@ -86,6 +87,12 @@ class HelpSelect(discord.ui.Select):
                 "<a:arr:1371326929042407435> `/toogle_anti-spam` - Toggle caps spam protection.\n"
                 "<a:arr:1371326929042407435> `/toogle_anti-link` - Toggle link blocker.\n"
                 "<a:arr:1371326929042407435> `/toogle_anti-invite` - Toggle invite blocker.\n"
+            )
+            
+        elif self.values[0] == "Fun And Enjoy":
+            embed.title = "Fun And Enjoy"
+            embed.description = (
+                "<a:arr:1371326929042407435> `/react` - Use for React With anime pics.\n"
             )
 
         await interaction.response.edit_message(embed=embed, view=self.view)
