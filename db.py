@@ -59,9 +59,10 @@ def init_db():
         image_url TEXT,
         end_time REAL,
         required_role TEXT,
-        winner_count INTEGER,
+        winner_count INTEGER DEFAULT 1,
         PRIMARY KEY (guild_id, message_id)
-    )''')
+    )
+''')
 # -------------------- Nickname Settings --------------------
 
 def get_nick_setting(guild_id):
@@ -350,7 +351,7 @@ def store_giveaway(guild_id, message_id, channel_id, image_url, end_time, requir
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute('''
-                INSERT INTO giveaways (guild_id, message_id, channel_id, image_url, end_time, required_role, winner_count)
+                INSERT OR REPLACE INTO giveaways (guild_id, message_id, channel_id, image_url, end_time, required_role, winner_count)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (guild_id, message_id, channel_id, image_url, end_time, required_role, winner_count))
     except sqlite3.Error as e:
