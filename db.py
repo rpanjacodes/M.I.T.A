@@ -50,42 +50,18 @@ def init_db():
             role_id INTEGER,
             enabled INTEGER DEFAULT 0
         )''')
+        
+        c.execute('''
+CREATE TABLE IF NOT EXISTS count_channel (
+    guild_id INTEGER PRIMARY KEY,
+    channel_id INTEGER,
+    allow_chat BOOLEAN,
+    last_user_id INTEGER DEFAULT 0,
+    last_number INTEGER DEFAULT 0,
+    last_message_id INTEGER DEFAULT NULL
+)
+''')
 
-# Create the count_channels table
-c.execute("""
-    CREATE TABLE IF NOT EXISTS count_channels (
-        guild_id INTEGER PRIMARY KEY,
-        channel_id INTEGER NOT NULL,
-        allow_chat BOOLEAN DEFAULT 0,
-        last_user_id INTEGER DEFAULT NULL,
-        last_number INTEGER DEFAULT 0
-    )
-""")
-
-# Set or update the count channel settings
-c.execute("""
-    INSERT INTO count_channels (guild_id, channel_id, allow_chat, last_user_id, last_number)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(guild_id) DO UPDATE SET
-        channel_id = excluded.channel_id,
-        allow_chat = excluded.allow_chat,
-        last_user_id = excluded.last_user_id,
-        last_number = excluded.last_number
-""", (guild_id, channel_id, allow_chat, last_user_id, last_number))
-
-# Retrieve count channel settings
-c.execute("""
-    SELECT channel_id, last_user_id, last_number, allow_chat
-    FROM count_channels
-    WHERE guild_id = ?
-""", (guild_id,))
-
-# Reset the count (admin command or on streak break)
-c.execute("""
-    UPDATE count_channels
-    SET last_user_id = NULL, last_number = 0
-    WHERE guild_id = ?
-""", (guild_id,))
 
 # -------------------- Nickname Settings --------------------
 
@@ -299,3 +275,52 @@ def get_regular_role_settings(guild_id):
     except sqlite3.Error as e:
         print(f"[DB] get_regular_role_settings error: {e}")
         return (None, 0)
+
+#------------------countingdb------------------
+
+def set_count_channel(guild_id, channel_id, allow_chat):
+    c.execute('''
+        INSERT INTO count_channel (guild_id, channel_id, allow_chat)
+        VALUES (?, ?, ?)
+        ON CONFLICT(guild_id) DO UPDATE SET channel_id = ?, allow_chat = ?
+    ''', (guild_id, channel_id, allow_chat, channel_id, allow_chat))
+    conn.commit()
+
+def get_count_channel_settings(guild_id):
+    c.execute('''
+        SELECT channel_id, allow_chat, last_user_id, last_number
+        FROM count_channel WHERE guild_id = ?
+    ''', (guild_id,))
+    return c.fetchone()
+
+def update_count_state(guild_id, user_id, number):
+    c.execute('''
+        UPDATE count_channel
+        SET last_user_id = ?, last_number = ?
+        WHERE guild_id = ?
+    ''', (user_id, number, guild_id))
+    conn.commit()
+
+def reset_count_state(guild_id):
+    c.execute('''
+        UPDATE count_channel
+        SET last_user_id = 0, last_number = 0, last_message_id = NULL
+        WHERE guild_id = ?
+    ''', (guild_id,))
+    conn.commit()
+
+def set_current_count_message_id(guild_id, message_id):
+    c.execute('''
+        UPDATE count_channel
+        SET last_message_id = ?
+        WHERE guild_id = ?
+    ''', (message_id, guild_id))
+    conn.commit()
+
+def get_current_count_message_id(guild_id):
+    c.execute('''
+        SELECT last_message_id FROM count_channel
+        WHERE guild_id = ?
+    ''', (guild_id,))
+    row = c.fetchone()
+    return row[0] if row else None
