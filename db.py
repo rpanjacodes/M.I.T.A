@@ -7,51 +7,51 @@ def init_db():
         c = conn.cursor()
 
         c.execute('''
-        CREATE TABLE IF NOT EXISTS settings (
-            guild_id INTEGER PRIMARY KEY,
-            nickname_toggle INTEGER DEFAULT 0,
-            nickname_format TEXT DEFAULT 'User_{username}'
-        )''')
+CREATE TABLE IF NOT EXISTS settings (
+    guild_id INTEGER PRIMARY KEY,
+    nickname_toggle INTEGER DEFAULT 0,
+    nickname_format TEXT DEFAULT 'User_{username}'
+)''')
 
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS automod (
-            guild_id INTEGER PRIMARY KEY,
-            anti_invite INTEGER DEFAULT 0,
-            anti_link INTEGER DEFAULT 0,
-            anti_spam INTEGER DEFAULT 0
-        )''')
+c.execute('''
+CREATE TABLE IF NOT EXISTS automod (
+    guild_id INTEGER PRIMARY KEY,
+    anti_invite INTEGER DEFAULT 0,
+    anti_link INTEGER DEFAULT 0,
+    anti_spam INTEGER DEFAULT 0
+)''')
 
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS pin_messages (
-            guild_id INTEGER,
-            channel_id INTEGER,
-            message TEXT,
-            message_id INTEGER,
-            enabled INTEGER DEFAULT 0,
-            PRIMARY KEY (guild_id, channel_id)
-        )''')
+c.execute('''
+CREATE TABLE IF NOT EXISTS pin_messages (
+    guild_id INTEGER,
+    channel_id INTEGER,
+    message TEXT,
+    message_id INTEGER,
+    enabled INTEGER DEFAULT 0,
+    PRIMARY KEY (guild_id, channel_id)
+)''')
 
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS log_settings (
-            guild_id INTEGER PRIMARY KEY,
-            log_channel_id INTEGER,
-            log_enabled INTEGER DEFAULT 0
-        )''')
+c.execute('''
+CREATE TABLE IF NOT EXISTS log_settings (
+    guild_id INTEGER PRIMARY KEY,
+    log_channel_id INTEGER,
+    log_enabled INTEGER DEFAULT 0
+)''')
 
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS chatbot_settings (
-            guild_id INTEGER PRIMARY KEY,
-            channel_id INTEGER
-        )''')
+c.execute('''
+CREATE TABLE IF NOT EXISTS chatbot_settings (
+    guild_id INTEGER PRIMARY KEY,
+    channel_id INTEGER
+)''')
 
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS regular_role (
-            guild_id INTEGER PRIMARY KEY,
-            role_id INTEGER,
-            enabled INTEGER DEFAULT 0
-        )''')
-        
-        c.execute('''
+c.execute('''
+CREATE TABLE IF NOT EXISTS regular_role (
+    guild_id INTEGER PRIMARY KEY,
+    role_id INTEGER,
+    enabled INTEGER DEFAULT 0
+)''')
+
+c.execute('''
 CREATE TABLE IF NOT EXISTS count_channel (
     guild_id INTEGER PRIMARY KEY,
     channel_id INTEGER,
@@ -59,9 +59,15 @@ CREATE TABLE IF NOT EXISTS count_channel (
     last_user_id INTEGER DEFAULT 0,
     last_number INTEGER DEFAULT 0,
     last_message_id INTEGER DEFAULT NULL
-)
-''')
+)''')
 
+c.execute('''
+CREATE TABLE IF NOT EXISTS count_state (
+    guild_id INTEGER,
+    user_id INTEGER,
+    last_number INTEGER DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id)
+)''')
 
 # -------------------- Nickname Settings --------------------
 
