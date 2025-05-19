@@ -16,14 +16,14 @@ class AutoMod(commands.Cog):
             "trigger_metadata": metadata,
             "actions": actions or [{"type": 1}],  # Type 1: block message
         }
-        await self.bot.http.request(method="POST", route=route, json=payload)
+        await self.bot.http.request(route, json=payload)
 
     async def delete_all_rules(self, guild_id: int):
         route = discord.http.Route("GET", f"/guilds/{guild_id}/auto-moderation/rules")
-        rules = await self.bot.http.request(method="GET", route=route)
+        rules = await self.bot.http.request(route)
         for rule in rules:
             delete_route = discord.http.Route("DELETE", f"/guilds/{guild_id}/auto-moderation/rules/{rule['id']}")
-            await self.bot.http.request(method="DELETE", route=delete_route)
+            await self.bot.http.request(delete_route)
 
     # ====== COMMANDS ======
 
