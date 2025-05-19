@@ -124,31 +124,6 @@ def set_nick_format(guild_id, format_str):
     except sqlite3.Error as e:
         print(f"[DB] set_nick_format error: {e}")
 
-# -------------------- AutoMod Settings --------------------
-
-def get_automod_settings(guild_id):
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT anti_invite, anti_link, anti_spam FROM automod WHERE guild_id = ?', (guild_id,))
-            row = c.fetchone()
-            return row if row else (0, 0, 0)
-    except sqlite3.Error as e:
-        print(f"[DB] get_automod_settings error: {e}")
-        return (0, 0, 0)
-
-def set_automod_setting(guild_id, field, value):
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute(f'''
-            INSERT INTO automod (guild_id, {field})
-            VALUES (?, ?)
-            ON CONFLICT(guild_id) DO UPDATE SET {field} = excluded.{field}
-            ''', (guild_id, value))
-    except sqlite3.Error as e:
-        print(f"[DB] set_automod_setting error: {e}")
-
 # -------------------- Persistent Pin Messages --------------------
 
 def set_pin_message(guild_id, channel_id, message, message_id, enabled=True):
@@ -254,50 +229,7 @@ def is_log_enabled(guild_id):
     except sqlite3.Error as e:
         print(f"[DB] is_log_enabled error: {e}")
         return False
-
-# -------------------- Anime Schedule Settings --------------------
-
-def set_anime_schedule_settings(guild_id, channel_id, mode='instant'):
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
-            INSERT INTO anime_schedule (guild_id, channel_id, mode)
-            VALUES (?, ?, ?)
-            ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id, mode = excluded.mode
-            ''', (guild_id, channel_id, mode))
-    except sqlite3.Error as e:
-        print(f"[DB] set_anime_schedule_settings error: {e}")
-
-def get_anime_schedule_settings(guild_id):
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT channel_id, mode FROM anime_schedule WHERE guild_id = ?', (guild_id,))
-            row = c.fetchone()
-            return row if row else (None, 'instant')
-    except sqlite3.Error as e:
-        print(f"[DB] get_anime_schedule_settings error: {e}")
-        return (None, 'instant')
-
-def has_posted_episode(episode_id):
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT 1 FROM posted_episodes WHERE episode_id = ?', (episode_id,))
-            return c.fetchone() is not None
-    except sqlite3.Error as e:
-        print(f"[DB] has_posted_episode error: {e}")
-        return False
-
-def mark_episode_posted(episode_id):
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('INSERT OR IGNORE INTO posted_episodes (episode_id) VALUES (?)', (episode_id,))
-    except sqlite3.Error as e:
-        print(f"[DB] mark_episode_posted error: {e}")
-
+        
 # -------------------- Chatbot Settings --------------------
 
 def set_chatbot_channel(guild_id, channel_id):
