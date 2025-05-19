@@ -84,15 +84,19 @@ class HelpSelect(discord.ui.Select):
         elif self.values[0] == "Automod":
             embed.title = "Automod"
             embed.description = (
-                "<a:arr:1371326929042407435> `/toogle_anti-spam` - Toggle caps spam protection.\n"
-                "<a:arr:1371326929042407435> `/toogle_anti-link` - Toggle link blocker.\n"
-                "<a:arr:1371326929042407435> `/toogle_anti-invite` - Toggle invite blocker.\n"
+                "<a:arr:1371326929042407435> `/automod_block_mentions` - Block Mentions With Automod.\n"
+                "<a:arr:1371326929042407435> `/automod_block_link` - Block Links with Automod.\n"
+                "<a:arr:1371326929042407435> `/automod_rule` - You Can Customise Automod.\n"
+                "<a:arr:1371326929042407435> `/automod_block_invite` - You Can Block Discord Invites with automod.\n"
+                "<a:arr:1371326929042407435> `/automod_block_word` - You can use to block default words that prohibited.\n"
             )
             
         elif self.values[0] == "Fun And Enjoy":
             embed.title = "Fun And Enjoy"
             embed.description = (
                 "<a:arr:1371326929042407435> `/react` - Use for React With anime pics.\n"
+                "<a:arr:1371326929042407435> `/count_channel` - You Can set count channel.\n"
+                "<a:arr:1371326929042407435> `/reset_count` - Reset Progress of Count.\n"
             )
 
         await interaction.response.edit_message(embed=embed, view=self.view)
