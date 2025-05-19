@@ -7,68 +7,62 @@ def init_db():
         c = conn.cursor()
 
         c.execute('''
-        CREATE TABLE IF NOT EXISTS settings (
-            guild_id INTEGER PRIMARY KEY,
-            nickname_toggle INTEGER DEFAULT 0,
-            nickname_format TEXT DEFAULT 'User_{username}'
-        )''')
+            CREATE TABLE IF NOT EXISTS settings (
+                guild_id INTEGER PRIMARY KEY,
+                nickname_toggle INTEGER DEFAULT 0,
+                nickname_format TEXT DEFAULT 'User_{username}'
+            )''')
 
         c.execute('''
-        CREATE TABLE IF NOT EXISTS automod (
-            guild_id INTEGER PRIMARY KEY,
-            anti_invite INTEGER DEFAULT 0,
-            anti_link INTEGER DEFAULT 0,
-            anti_spam INTEGER DEFAULT 0
-        )''')
+            CREATE TABLE IF NOT EXISTS automod (
+                guild_id INTEGER PRIMARY KEY,
+                anti_invite INTEGER DEFAULT 0,
+                anti_link INTEGER DEFAULT 0,
+                anti_spam INTEGER DEFAULT 0
+            )''')
 
         c.execute('''
-        CREATE TABLE IF NOT EXISTS pin_messages (
-            guild_id INTEGER,
-            channel_id INTEGER,
-            message TEXT,
-            message_id INTEGER,
-            enabled INTEGER DEFAULT 0,
-            PRIMARY KEY (guild_id, channel_id)
-        )''')
+            CREATE TABLE IF NOT EXISTS pin_messages (
+                guild_id INTEGER,
+                channel_id INTEGER,
+                message TEXT,
+                message_id INTEGER,
+                enabled INTEGER DEFAULT 0,
+                PRIMARY KEY (guild_id, channel_id)
+            )''')
 
         c.execute('''
-        CREATE TABLE IF NOT EXISTS log_settings (
-            guild_id INTEGER PRIMARY KEY,
-            log_channel_id INTEGER,
-            log_enabled INTEGER DEFAULT 0
-        )''')
+            CREATE TABLE IF NOT EXISTS log_settings (
+                guild_id INTEGER PRIMARY KEY,
+                log_channel_id INTEGER,
+                log_enabled INTEGER DEFAULT 0
+            )''')
 
         c.execute('''
-        CREATE TABLE IF NOT EXISTS chatbot_settings (
-            guild_id INTEGER PRIMARY KEY,
-            channel_id INTEGER
-        )''')
+            CREATE TABLE IF NOT EXISTS chatbot_settings (
+                guild_id INTEGER PRIMARY KEY,
+                channel_id INTEGER
+            )''')
 
         c.execute('''
-        CREATE TABLE IF NOT EXISTS regular_role (
-            guild_id INTEGER PRIMARY KEY,
-            role_id INTEGER,
-            enabled INTEGER DEFAULT 0
-        )''')
+            CREATE TABLE IF NOT EXISTS regular_role (
+                guild_id INTEGER PRIMARY KEY,
+                role_id INTEGER,
+                enabled INTEGER DEFAULT 0
+            )''')
 
         c.execute('''
-        CREATE TABLE IF NOT EXISTS count_channel (
-            guild_id INTEGER PRIMARY KEY,
-            channel_id INTEGER,
-            allow_chat BOOLEAN,
-            last_user_id INTEGER DEFAULT 0,
-            last_number INTEGER DEFAULT 0,
-            last_message_id INTEGER DEFAULT NULL
-        )''')
+            CREATE TABLE IF NOT EXISTS count_channels (
+                guild_id INTEGER PRIMARY KEY,
+                channel_id INTEGER
+            )''')
 
         c.execute('''
-        CREATE TABLE IF NOT EXISTS count_state (
-            guild_id INTEGER,
-            user_id INTEGER,
-            last_number INTEGER DEFAULT 0,
-            PRIMARY KEY (guild_id, user_id)
-        )''')
-
+            CREATE TABLE IF NOT EXISTS count_progress (
+                guild_id INTEGER PRIMARY KEY,
+                count INTEGER DEFAULT 0,
+                last_user_id INTEGER
+            )''')
 
 # -------------------- Nickname Settings --------------------
 
@@ -106,7 +100,6 @@ def set_nick_format(guild_id, format_str):
             ''', (guild_id, format_str))
     except sqlite3.Error as e:
         print(f"[DB] set_nick_format error: {e}")
-
 
 # -------------------- Pin Messages --------------------
 
@@ -171,7 +164,6 @@ def get_full_pin_data(guild_id, channel_id):
         print(f"[DB] get_full_pin_data error: {e}")
         return (None, None, False)
 
-
 # -------------------- Logging --------------------
 
 def set_log_settings(guild_id, channel_id=None, enabled=None):
@@ -215,7 +207,6 @@ def is_log_enabled(guild_id):
         print(f"[DB] is_log_enabled error: {e}")
         return False
 
-
 # -------------------- Chatbot --------------------
 
 def set_chatbot_channel(guild_id, channel_id):
@@ -248,7 +239,6 @@ def remove_chatbot_channel(guild_id):
             c.execute('DELETE FROM chatbot_settings WHERE guild_id = ?', (guild_id,))
     except sqlite3.Error as e:
         print(f"[DB] remove_chatbot_channel error: {e}")
-
 
 # -------------------- Regular Role --------------------
 
@@ -287,50 +277,83 @@ def get_regular_role_settings(guild_id):
         print(f"[DB] get_regular_role_settings error: {e}")
         return (None, 0)
 
+# -------------------- Counting -----------------
 
-# -------------------- Counting --------------------
-
-def set_count_channel(guild_id, channel_id, allow_chat):
+def set_count_channel(guild_id: int, channel_id: int):
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute('''
-                INSERT INTO count_channel (guild_id, channel_id, allow_chat)
-                VALUES (?, ?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET channel_id = ?, allow_chat = ?
-            ''', (guild_id, channel_id, allow_chat, channel_id, allow_chat))
+                INSERT INTO count_channels (guild_id, channel_id)
+                VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id
+            ''', (guild_id, channel_id))
     except sqlite3.Error as e:
         print(f"[DB] set_count_channel error: {e}")
 
-def get_count_channel_settings(guild_id):
+def get_count_channel(guild_id: int):
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
-            c.execute('SELECT channel_id, allow_chat FROM count_channel WHERE guild_id = ?', (guild_id,))
-            return c.fetchone()
+            c.execute("SELECT channel_id FROM count_channels WHERE guild_id = ?", (guild_id,))
+            row = c.fetchone()
+            return row[0] if row else None
     except sqlite3.Error as e:
-        print(f"[DB] get_count_channel_settings error: {e}")
+        print(f"[DB] get_count_channel error: {e}")
         return None
 
-def update_count_state(guild_id, user_id, number):
+def remove_count_channel(guild_id: int):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute("DELETE FROM count_channels WHERE guild_id = ?", (guild_id,))
+    except sqlite3.Error as e:
+        print(f"[DB] remove_count_channel error: {e}")
+
+def get_current_count(guild_id: int):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute("SELECT count FROM count_progress WHERE guild_id = ?", (guild_id,))
+            row = c.fetchone()
+            return row[0] if row else 0
+    except sqlite3.Error as e:
+        print(f"[DB] get_current_count error: {e}")
+        return 0
+
+def get_last_counter(guild_id: int):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute("SELECT last_user_id FROM count_progress WHERE guild_id = ?", (guild_id,))
+            row = c.fetchone()
+            return row[0] if row else None
+    except sqlite3.Error as e:
+        print(f"[DB] get_last_counter error: {e}")
+        return None
+
+def update_count(guild_id: int, new_count: int, user_id: int):
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute('''
-                INSERT INTO count_state (guild_id, user_id, last_number)
+                INSERT INTO count_progress (guild_id, count, last_user_id)
                 VALUES (?, ?, ?)
-                ON CONFLICT(guild_id, user_id) DO UPDATE SET last_number = excluded.last_number
-            ''', (guild_id, user_id, number))
+                ON CONFLICT(guild_id) DO UPDATE
+                SET count = excluded.count, last_user_id = excluded.last_user_id
+            ''', (guild_id, new_count, user_id))
     except sqlite3.Error as e:
-        print(f"[DB] update_count_state error: {e}")
+        print(f"[DB] update_count error: {e}")
 
-def get_count_state(guild_id, user_id):
+def reset_count(guild_id: int):
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
-            c.execute('SELECT last_number FROM count_state WHERE guild_id = ? AND user_id = ?', (guild_id, user_id))
-            row = c.fetchone()
-            return row[0] if row else 0
+            c.execute('''
+                INSERT INTO count_progress (guild_id, count, last_user_id)
+                VALUES (?, 0, NULL)
+                ON CONFLICT(guild_id) DO UPDATE
+                SET count = 0, last_user_id = NULL
+            ''', (guild_id,))
     except sqlite3.Error as e:
-        print(f"[DB] get_count_state error: {e}")
-        return 0
+        print(f"[DB] reset_count error: {e}")
