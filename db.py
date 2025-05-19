@@ -279,48 +279,45 @@ def get_regular_role_settings(guild_id):
 #------------------countingdb------------------
 
 def set_count_channel(guild_id, channel_id, allow_chat):
-    c.execute('''
-        INSERT INTO count_channel (guild_id, channel_id, allow_chat)
-        VALUES (?, ?, ?)
-        ON CONFLICT(guild_id) DO UPDATE SET channel_id = ?, allow_chat = ?
-    ''', (guild_id, channel_id, allow_chat, channel_id, allow_chat))
-    conn.commit()
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('''
+                INSERT INTO count_channel (guild_id, channel_id, allow_chat)
+                VALUES (?, ?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET channel_id = ?, allow_chat = ?
+            ''', (guild_id, channel_id, allow_chat, channel_id, allow_chat))
+    except sqlite3.Error as e:
+        print(f"[DB] set_count_channel error: {e}")
 
 def get_count_channel_settings(guild_id):
-    c.execute('''
-        SELECT channel_id, allow_chat, last_user_id, last_number
-        FROM count_channel WHERE guild_id = ?
-    ''', (guild_id,))
-    return c.fetchone()
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('SELECT channel_id, allow_chat FROM count_channel WHERE guild_id = ?', (guild_id,))
+            return c.fetchone()
+    except sqlite3.Error as e:
+        print(f"[DB] get_count_channel_settings error: {e}")
+        return None
 
-def update_count_state(guild_id, user_id, number):
-    c.execute('''
-        UPDATE count_channel
-        SET last_user_id = ?, last_number = ?
-        WHERE guild_id = ?
-    ''', (user_id, number, guild_id))
-    conn.commit()
+def update_count_state(guild_id, last_user_id, last_number):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('''
+                INSERT INTO count_state (guild_id, last_user_id, last_number)
+                VALUES (?, ?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET last_user_id = ?, last_number = ?
+            ''', (guild_id, last_user_id, last_number, last_user_id, last_number))
+    except sqlite3.Error as e:
+        print(f"[DB] update_count_state error: {e}")
 
-def reset_count_state(guild_id):
-    c.execute('''
-        UPDATE count_channel
-        SET last_user_id = 0, last_number = 0, last_message_id = NULL
-        WHERE guild_id = ?
-    ''', (guild_id,))
-    conn.commit()
-
-def set_current_count_message_id(guild_id, message_id):
-    c.execute('''
-        UPDATE count_channel
-        SET last_message_id = ?
-        WHERE guild_id = ?
-    ''', (message_id, guild_id))
-    conn.commit()
-
-def get_current_count_message_id(guild_id):
-    c.execute('''
-        SELECT last_message_id FROM count_channel
-        WHERE guild_id = ?
-    ''', (guild_id,))
-    row = c.fetchone()
-    return row[0] if row else None
+def get_count_state(guild_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('SELECT last_user_id, last_number FROM count_state WHERE guild_id = ?', (guild_id,))
+            return c.fetchone()
+    except sqlite3.Error as e:
+        print(f"[DB] get_count_state error: {e}")
+        return None
