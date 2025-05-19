@@ -51,6 +51,42 @@ def init_db():
             enabled INTEGER DEFAULT 0
         )''')
 
+# Create the count_channels table
+c.execute("""
+    CREATE TABLE IF NOT EXISTS count_channels (
+        guild_id INTEGER PRIMARY KEY,
+        channel_id INTEGER NOT NULL,
+        allow_chat BOOLEAN DEFAULT 0,
+        last_user_id INTEGER DEFAULT NULL,
+        last_number INTEGER DEFAULT 0
+    )
+""")
+
+# Set or update the count channel settings
+c.execute("""
+    INSERT INTO count_channels (guild_id, channel_id, allow_chat, last_user_id, last_number)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(guild_id) DO UPDATE SET
+        channel_id = excluded.channel_id,
+        allow_chat = excluded.allow_chat,
+        last_user_id = excluded.last_user_id,
+        last_number = excluded.last_number
+""", (guild_id, channel_id, allow_chat, last_user_id, last_number))
+
+# Retrieve count channel settings
+c.execute("""
+    SELECT channel_id, last_user_id, last_number, allow_chat
+    FROM count_channels
+    WHERE guild_id = ?
+""", (guild_id,))
+
+# Reset the count (admin command or on streak break)
+c.execute("""
+    UPDATE count_channels
+    SET last_user_id = NULL, last_number = 0
+    WHERE guild_id = ?
+""", (guild_id,))
+
 # -------------------- Nickname Settings --------------------
 
 def get_nick_setting(guild_id):
