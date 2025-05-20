@@ -63,6 +63,18 @@ def init_db():
                 count INTEGER DEFAULT 0,
                 last_user_id INTEGER
             )''')
+        
+        # DM greet settings table
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS dm_greet_settings (
+                guild_id INTEGER PRIMARY KEY,
+                enabled INTEGER DEFAULT 0,
+                title TEXT DEFAULT 'Welcome {user}!',
+                description TEXT DEFAULT 'Glad to have you in {server}!',
+                image_url TEXT,
+                footer TEXT
+            )
+        ''')
 
 # -------------------- Nickname Settings --------------------
 
@@ -357,3 +369,55 @@ def reset_count(guild_id: int):
             ''', (guild_id,))
     except sqlite3.Error as e:
         print(f"[DB] reset_count error: {e}")
+        
+        # -------------------- DM Greet Settings --------------------
+
+def get_dm_greet_settings(guild_id):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute('SELECT enabled, title, description, image_url, footer FROM dm_greet_settings WHERE guild_id = ?', (guild_id,))
+            row = c.fetchone()
+            if row:
+                return {
+                    'enabled': bool(row[0]),
+                    'title': row[1],
+                    'description': row[2],
+                    'image_url': row[3],
+                    'footer': row[4]
+                }
+            return {
+                'enabled': False,
+                'title': 'Welcome {user}!',
+                'description': 'Glad to have you in {server}!',
+                'image_url': None,
+                'footer': None
+            }
+    except sqlite3.Error as e:
+        print(f"[DB] get_dm_greet_settings error: {e}")
+        return None
+
+def set_dm_greet_settings(guild_id, enabled=None, title=None, description=None, image_url=None, footer=None):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+
+            # Ensure a row exists
+            c.execute('''
+                INSERT OR IGNORE INTO dm_greet_settings (guild_id) VALUES (?)
+            ''', (guild_id,))
+
+            if enabled is not None:
+                c.execute('UPDATE dm_greet_settings SET enabled = ? WHERE guild_id = ?', (int(enabled), guild_id))
+            if title is not None:
+                c.execute('UPDATE dm_greet_settings SET title = ? WHERE guild_id = ?', (title, guild_id))
+            if description is not None:
+                c.execute('UPDATE dm_greet_settings SET description = ? WHERE guild_id = ?', (description, guild_id))
+            if image_url is not None:
+                c.execute('UPDATE dm_greet_settings SET image_url = ? WHERE guild_id = ?', (image_url, guild_id))
+            if footer is not None:
+                c.execute('UPDATE dm_greet_settings SET footer = ? WHERE guild_id = ?', (footer, guild_id))
+    except sqlite3.Error as e:
+        print(f"[DB] set_dm_greet_settings error: {e}")
+
+
