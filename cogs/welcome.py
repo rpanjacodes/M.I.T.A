@@ -50,7 +50,9 @@ class Welcome(commands.Cog):
 
         image = await self.build_welcome_image(member, settings)
 
-        description = settings['description'].replace("{user}", member.mention).replace("{server}", member.guild.name)
+        # Use display name instead of mention to avoid breaking when user leaves
+        username = member.display_name
+        description = settings['description'].replace("{user}", username).replace("{server}", member.guild.name)
 
         file = discord.File(fp=image, filename="welcome.png")
         embed = discord.Embed(description=description, color=discord.Color.blue())
@@ -79,8 +81,8 @@ class Welcome(commands.Cog):
         bg.paste(avatar, (60, 115), avatar)
 
         draw = ImageDraw.Draw(bg)
-        font_big = ImageFont.truetype("fonts/arial.ttf", 60)
-        font_small = ImageFont.truetype("fonts/arial.ttf", 36)
+        font_big = ImageFont.truetype("arial.ttf", 60)
+        font_small = ImageFont.truetype("arial.ttf", 36)
 
         draw.text((350, 150), settings['big_text'], font=font_big, fill="white")
         draw.text((350, 230), settings['small_text'], font=font_small, fill="white")
