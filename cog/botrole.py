@@ -4,14 +4,13 @@ from discord import app_commands
 import asyncio
 import random
 
-class AssignRole(commands.Cog):
+class BotRole(commands.Cog):  # Renamed class to match the filename
     def __init__(self, bot):
         self.bot = bot
 
     @app_commands.command(name="assignrole_bots", description="Assign a role to all bot members.")
     @app_commands.describe(role="The role to assign to all bots.")
     async def assignrole_bots(self, interaction: discord.Interaction, role: discord.Role):
-        # Permission Check
         if not interaction.user.guild_permissions.manage_guild:
             await interaction.response.send_message(
                 "❌ You need the **Manage Server** permission to use this command.",
@@ -19,7 +18,6 @@ class AssignRole(commands.Cog):
             )
             return
 
-        # Filter bot members who don't already have the role
         members = [m for m in interaction.guild.members if m.bot and role not in m.roles]
         total = len(members)
 
@@ -36,7 +34,7 @@ class AssignRole(commands.Cog):
             try:
                 await member.add_roles(role, reason="Mass bot role assignment")
                 success += 1
-                await asyncio.sleep(1)  # 1-second delay for safety
+                await asyncio.sleep(1)
             except discord.HTTPException as e:
                 if e.status == 429:
                     retry_after = getattr(e, "retry_after", 5)
@@ -51,4 +49,4 @@ class AssignRole(commands.Cog):
         )
 
 async def setup(bot):
-    await bot.add_cog(AssignRole(bot))
+    await bot.add_cog(BotRole(bot))  # Make sure this matches the class name
