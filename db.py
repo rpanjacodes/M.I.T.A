@@ -11,7 +11,8 @@ def init_db():
                 guild_id INTEGER PRIMARY KEY,
                 nickname_toggle INTEGER DEFAULT 0,
                 nickname_format TEXT DEFAULT 'User_{username}'
-            )''')
+            )
+        ''')
 
         c.execute('''
             CREATE TABLE IF NOT EXISTS automod (
@@ -19,7 +20,8 @@ def init_db():
                 anti_invite INTEGER DEFAULT 0,
                 anti_link INTEGER DEFAULT 0,
                 anti_spam INTEGER DEFAULT 0
-            )''')
+            )
+        ''')
 
         c.execute('''
             CREATE TABLE IF NOT EXISTS pin_messages (
@@ -29,42 +31,47 @@ def init_db():
                 message_id INTEGER,
                 enabled INTEGER DEFAULT 0,
                 PRIMARY KEY (guild_id, channel_id)
-            )''')
+            )
+        ''')
 
         c.execute('''
             CREATE TABLE IF NOT EXISTS log_settings (
                 guild_id INTEGER PRIMARY KEY,
                 log_channel_id INTEGER,
                 log_enabled INTEGER DEFAULT 0
-            )''')
+            )
+        ''')
 
         c.execute('''
             CREATE TABLE IF NOT EXISTS chatbot_settings (
                 guild_id INTEGER PRIMARY KEY,
                 channel_id INTEGER
-            )''')
+            )
+        ''')
 
         c.execute('''
             CREATE TABLE IF NOT EXISTS regular_role (
                 guild_id INTEGER PRIMARY KEY,
                 role_id INTEGER,
                 enabled INTEGER DEFAULT 0
-            )''')
+            )
+        ''')
 
         c.execute('''
             CREATE TABLE IF NOT EXISTS count_channels (
                 guild_id INTEGER PRIMARY KEY,
                 channel_id INTEGER
-            )''')
+            )
+        ''')
 
         c.execute('''
             CREATE TABLE IF NOT EXISTS count_progress (
                 guild_id INTEGER PRIMARY KEY,
                 count INTEGER DEFAULT 0,
                 last_user_id INTEGER
-            )''')
-        
-        # DM greet settings table
+            )
+        ''')
+
         c.execute('''
             CREATE TABLE IF NOT EXISTS dm_greet_settings (
                 guild_id INTEGER PRIMARY KEY,
@@ -75,6 +82,68 @@ def init_db():
                 footer TEXT
             )
         ''')
+
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS welcome_settings (
+                guild_id INTEGER PRIMARY KEY,
+                channel_id INTEGER,
+                description TEXT DEFAULT 'Welcome {user} to {server}!',
+                image_url TEXT,
+                big_text TEXT DEFAULT 'Welcome!',
+                small_text TEXT DEFAULT 'Enjoy your stay!',
+                enabled INTEGER DEFAULT 0
+            )
+        ''')
+
+# -------------------- Welcome Settings --------------------
+
+def set_welcome_settings(guild_id, channel_id, bg_url, big_text, small_text, description):
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO welcome_settings (guild_id, channel_id, image_url, big_text, small_text, description, enabled)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+            ON CONFLICT(guild_id) DO UPDATE SET
+                channel_id = excluded.channel_id,
+                image_url = excluded.image_url,
+                big_text = excluded.big_text,
+                small_text = excluded.small_text,
+                description = excluded.description,
+                enabled = 1
+        ''', (guild_id, channel_id, bg_url, big_text, small_text, description))
+        conn.commit()
+
+def get_welcome_settings(guild_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM welcome_settings WHERE guild_id = ?", (guild_id,))
+        row = c.fetchone()
+        if row:
+            return {
+                "guild_id": row[0],
+                "channel_id": row[1],
+                "description": row[2],
+                "bg_url": row[3],
+                "big_text": row[4],
+                "small_text": row[5],
+                "enabled": bool(row[6])
+            }
+        return None
+
+def toggle_welcome(guild_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("SELECT enabled FROM welcome_settings WHERE guild_id = ?", (guild_id,))
+        row = c.fetchone()
+        if row:
+            new_status = 0 if row[0] else 1
+            c.execute("UPDATE welcome_settings SET enabled = ? WHERE guild_id = ?", (new_status, guild_id))
+            conn.commit()
+            return new_status
+        else:
+            c.execute("INSERT INTO welcome_settings (guild_id, enabled) VALUES (?, 1)", (guild_id,))
+            conn.commit()
+            return 1
 
 # -------------------- Nickname Settings --------------------
 
@@ -420,4 +489,4 @@ def set_dm_greet_settings(guild_id, enabled=None, title=None, description=None, 
     except sqlite3.Error as e:
         print(f"[DB] set_dm_greet_settings error: {e}")
 
-
+        
