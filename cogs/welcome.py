@@ -18,7 +18,15 @@ class Welcome(commands.Cog):
         small_text="Small text on image",
         description="Welcome message (use {user} and {server})"
     )
-    async def set_welcome(self, interaction: discord.Interaction, channel: discord.TextChannel, bg_url: str, big_text: str, small_text: str, description: str):
+    async def set_welcome(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel,
+        bg_url: str,
+        big_text: str,
+        small_text: str,
+        description: str
+    ):
         if not interaction.user.guild_permissions.manage_guild:
             await interaction.response.send_message("❌ You need **Manage Server** permission to use this command.", ephemeral=True)
             return
@@ -50,7 +58,7 @@ class Welcome(commands.Cog):
 
         image = await self.build_welcome_image(member, settings)
 
-        # Use display name instead of mention to avoid breaking when user leaves
+        # Use display_name instead of mention to prevent raw ID if user leaves
         username = member.display_name
         description = settings['description'].replace("{user}", username).replace("{server}", member.guild.name)
 
@@ -60,33 +68,40 @@ class Welcome(commands.Cog):
         await channel.send(file=file, embed=embed)
 
     async def build_welcome_image(self, member, settings):
-        # Download background
+        # Download background image
         async with aiohttp.ClientSession() as session:
             async with session.get(settings['bg_url']) as resp:
                 bg_bytes = await resp.read()
         bg = Image.open(BytesIO(bg_bytes)).convert("RGBA").resize((1280, 480))
 
-        # Download avatar
+        # Download user's avatar
         async with aiohttp.ClientSession() as session:
             async with session.get(member.display_avatar.url) as resp:
                 avatar_bytes = await resp.read()
         avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((250, 250))
 
-        # Circle crop
+        # Apply circular mask to avatar
         mask = Image.new("L", avatar.size, 0)
         draw = ImageDraw.Draw(mask)
         draw.ellipse((0, 0, 250, 250), fill=255)
         avatar.putalpha(mask)
-
         bg.paste(avatar, (60, 115), avatar)
 
         draw = ImageDraw.Draw(bg)
-        font_big = ImageFont.truetype("arial.ttf", 60)
-        font_small = ImageFont.truetype("arial.ttf", 36)
 
+        # Load fonts with fallback
+        try:
+            font_big = ImageFont.truetype("arial.ttf", 60)
+            font_small = ImageFont.truetype("arial.ttf", 36)
+        except OSError:
+            font_big = ImageFont.load_default()
+            font_small = ImageFont.load_default()
+
+        # Draw big and small text
         draw.text((350, 150), settings['big_text'], font=font_big, fill="white")
         draw.text((350, 230), settings['small_text'], font=font_small, fill="white")
 
+        # Output image to bytes
         output = BytesIO()
         bg.save(output, format="PNG")
         output.seek(0)
