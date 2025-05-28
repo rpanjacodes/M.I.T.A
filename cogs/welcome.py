@@ -91,8 +91,8 @@ class Welcome(commands.Cog):
 
         # Load fonts with fallback
         try:
-            font_big = ImageFont.truetype("arial.ttf", 60)
-            font_small = ImageFont.truetype("arial.ttf", 36)
+            font_big = ImageFont.truetype("fonts/arial.ttf", 60)
+            font_small = ImageFont.truetype("fonts/arial.ttf", 36)
         except OSError:
             font_big = ImageFont.load_default()
             font_small = ImageFont.load_default()
