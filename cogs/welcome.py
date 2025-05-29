@@ -58,9 +58,8 @@ class Welcome(commands.Cog):
 
         image = await self.build_welcome_image(member, settings)
 
-        # Use display_name instead of mention to prevent raw ID if user leaves
-        username = member.display_name
-        description = settings['description'].replace("{user}", username).replace("{server}", member.guild.name)
+        # Use mention instead of display_name for clickable mention
+        description = settings['description'].replace("{user}", member.mention).replace("{server}", member.guild.name)
 
         file = discord.File(fp=image, filename="welcome.png")
         embed = discord.Embed(description=description, color=discord.Color.blue())
@@ -68,44 +67,52 @@ class Welcome(commands.Cog):
         await channel.send(file=file, embed=embed)
 
     async def build_welcome_image(self, member, settings):
-        # Download background image
-        async with aiohttp.ClientSession() as session:
-            async with session.get(settings['bg_url']) as resp:
-                bg_bytes = await resp.read()
-        bg = Image.open(BytesIO(bg_bytes)).convert("RGBA").resize((1280, 480))
-
-        # Download user's avatar
-        async with aiohttp.ClientSession() as session:
-            async with session.get(member.display_avatar.url) as resp:
-                avatar_bytes = await resp.read()
-        avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((250, 250))
-
-        # Apply circular mask to avatar
-        mask = Image.new("L", avatar.size, 0)
-        draw = ImageDraw.Draw(mask)
-        draw.ellipse((0, 0, 250, 250), fill=255)
-        avatar.putalpha(mask)
-        bg.paste(avatar, (60, 115), avatar)
-
-        draw = ImageDraw.Draw(bg)
-
-        # Load fonts with fallback
         try:
-            font_big = ImageFont.truetype("fonts/arial.ttf", 60)
-            font_small = ImageFont.truetype("fonts/arial.ttf", 36)
-        except OSError:
-            font_big = ImageFont.load_default()
-            font_small = ImageFont.load_default()
+            async with aiohttp.ClientSession() as session:
+                # Download background image
+                async with session.get(settings['bg_url']) as resp:
+                    if resp.status != 200:
+                        raise Exception("Failed to download background image")
+                    bg_bytes = await resp.read()
+                bg = Image.open(BytesIO(bg_bytes)).convert("RGBA").resize((1280, 480))
 
-        # Draw big and small text
-        draw.text((350, 150), settings['big_text'], font=font_big, fill="white")
-        draw.text((350, 230), settings['small_text'], font=font_small, fill="white")
+                # Download user avatar
+                async with session.get(member.display_avatar.url) as resp:
+                    if resp.status != 200:
+                        raise Exception("Failed to download avatar")
+                    avatar_bytes = await resp.read()
+                avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((250, 250))
 
-        # Output image to bytes
-        output = BytesIO()
-        bg.save(output, format="PNG")
-        output.seek(0)
-        return output
+            # Apply circular mask to avatar
+            mask = Image.new("L", avatar.size, 0)
+            draw = ImageDraw.Draw(mask)
+            draw.ellipse((0, 0, 250, 250), fill=255)
+            avatar.putalpha(mask)
+            bg.paste(avatar, (60, 115), avatar)
+
+            draw = ImageDraw.Draw(bg)
+
+            # Load fonts with fallback
+            try:
+                font_big = ImageFont.truetype("fonts/arial.ttf", 60)
+                font_small = ImageFont.truetype("fonts/arial.ttf", 36)
+            except OSError:
+                font_big = ImageFont.load_default()
+                font_small = ImageFont.load_default()
+
+            # Draw big and small text
+            draw.text((350, 150), settings['big_text'], font=font_big, fill="white")
+            draw.text((350, 230), settings['small_text'], font=font_small, fill="white")
+
+            # Output image to bytes
+            output = BytesIO()
+            bg.save(output, format="PNG")
+            output.seek(0)
+            return output
+
+        except Exception as e:
+            print(f"[Welcome] Failed to build welcome image: {e}")
+            return BytesIO()  # fallback to empty image if needed
 
 async def setup(bot):
     await bot.add_cog(Welcome(bot))
