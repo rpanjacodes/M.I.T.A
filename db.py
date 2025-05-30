@@ -122,10 +122,10 @@ def get_welcome_settings(guild_id):
             return {
                 "guild_id": row[0],
                 "channel_id": row[1],
-                "bg_url": row[2],       # Fixed: image_url
+                "bg_url": row[2],         # ✅ fixed: image_url is at index 2
                 "big_text": row[3],
                 "small_text": row[4],
-                "description": row[5],
+                "description": row[5],    # ✅ fixed: description is at index 5
                 "enabled": bool(row[6])
             }
         return None
