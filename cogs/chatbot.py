@@ -1,20 +1,3 @@
-# M.I.T.A - Discord Bot Project
-# Copyright (C) 2025 M.I.T.A Bot Team
-# 
-# This file is part of M.I.T.A.
-# 
-# M.I.T.A is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# M.I.T.A is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <https://www.gnu.org/licenses/>.
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -23,9 +6,9 @@ import aiohttp
 
 # --------------------- Config ---------------------
 
-SHAPES_API_KEY = "shapes_api"  # Put your API key directly here
-SHAPES_API_URL = "https://api.shapes.inc/v1/chat/completions"  # Correct endpoint
-SHAPES_MODEL = "shapesinc/milarussianmita"  # <-- Replace with your actual shape username
+SHAPES_API_KEY = ""  # Your Shapes API Key
+SHAPES_API_URL = "https://api.shapes.inc/v1/chat/completions"
+SHAPES_MODEL = "shapesinc/m.i.t.a_for_discord"  # Replace with your actual model
 DB_PATH = "bot.db"
 
 # --------------------- Database Utils ---------------------
@@ -116,9 +99,10 @@ class ChatbotCog(commands.Cog):
                         reply = data['choices'][0]['message']['content']
                         await message.reply(reply)
                     else:
-                        await message.reply("Failed to get a response from the chatbot API.")
+                        error_text = await resp.text()
+                        await message.reply(f"Failed to get a response from the chatbot API.\n**Status:** {resp.status}\n**Details:** {error_text}")
         except Exception as e:
-            await message.channel.send(f"API error: {e}")
+            await message.channel.send(f"API error: `{e}`")
 
 # --------------------- Setup ---------------------
 
