@@ -2,10 +2,7 @@ import discord
 from discord.ext import commands
 import asyncio
 import os
-from db import init_db  # Handles all DB tables
-
-# Initialize the database
-init_db()
+from db import connect_db, init_db  # Connect pool and initialize tables
 
 # Bot intents
 intents = discord.Intents.default()
@@ -69,6 +66,8 @@ async def load_cogs():
 
 # Main function to start the bot
 async def main():
+    await connect_db()     # Connect PostgreSQL pool
+    await init_db()        # Create tables
     async with bot:
         await load_cogs()
         await bot.start("majduri_ka_token")  # Replace with your real token
