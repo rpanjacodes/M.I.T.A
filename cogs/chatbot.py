@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import sqlite3
 import aiohttp
 
 # --------------------- Config ---------------------
@@ -9,47 +8,15 @@ import aiohttp
 SHAPES_API_KEY = ""  # Your Shapes API Key
 SHAPES_API_URL = "https://api.shapes.inc/v1/chat/completions"
 SHAPES_MODEL = "shapesinc/m.i.t.a_for_discord"  # Replace with your actual model
-DB_PATH = "bot.db"
 
-# --------------------- Database Utils ---------------------
-
-def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS chatbot_settings (
-                guild_id INTEGER PRIMARY KEY,
-                channel_id INTEGER
-            )
-        ''')
-
-def set_chatbot_channel(guild_id, channel_id):
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute('''
-            INSERT INTO chatbot_settings (guild_id, channel_id)
-            VALUES (?, ?)
-            ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id
-        ''', (guild_id, channel_id))
-
-def disable_chatbot_channel(guild_id):
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute('DELETE FROM chatbot_settings WHERE guild_id = ?', (guild_id,))
-
-def get_chatbot_channel(guild_id):
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute('SELECT channel_id FROM chatbot_settings WHERE guild_id = ?', (guild_id,))
-        row = c.fetchone()
-        return row[0] if row else None
+# --------------------- PostgreSQL DB Import ---------------------
+from db import get_chatbot_channel, set_chatbot_channel, remove_chatbot_channel
 
 # --------------------- Cog ---------------------
 
 class ChatbotCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        init_db()
 
     @app_commands.command(name="set_chatbot", description="Enable chatbot in a channel.")
     @app_commands.describe(channel="Channel where chatbot will reply")
@@ -57,7 +24,7 @@ class ChatbotCog(commands.Cog):
         if not interaction.user.guild_permissions.manage_guild:
             await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
             return
-        set_chatbot_channel(interaction.guild.id, channel.id)
+        await set_chatbot_channel(interaction.guild.id, channel.id)
         await interaction.response.send_message(f"Chatbot enabled in {channel.mention}.")
 
     @app_commands.command(name="disable_chatbot", description="Disable chatbot in the server.")
@@ -65,7 +32,7 @@ class ChatbotCog(commands.Cog):
         if not interaction.user.guild_permissions.manage_guild:
             await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
             return
-        disable_chatbot_channel(interaction.guild.id)
+        await remove_chatbot_channel(interaction.guild.id)
         await interaction.response.send_message("Chatbot disabled.")
 
     @commands.Cog.listener()
@@ -73,7 +40,7 @@ class ChatbotCog(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        chatbot_channel_id = get_chatbot_channel(message.guild.id)
+        chatbot_channel_id = await get_chatbot_channel(message.guild.id)
         if not chatbot_channel_id or message.channel.id != chatbot_channel_id:
             return
 
