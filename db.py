@@ -1,13 +1,17 @@
 import asyncpg
 import asyncio
 
-DB_URL = "postgresql://user:pass@localhost:5432/yourdb"  # ← Replace with your connection string
+DB_URL = "postgresql://neondb_owner:npg_js0uh9UaBJIV@ep-morning-smoke-a1e53vfz-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 pool = None
 
 async def connect_db():
     global pool
-    pool = await asyncpg.create_pool(DB_URL)
+    try:
+        pool = await asyncpg.create_pool(dsn=DB_URL)
+        print("[DB] Connected to PostgreSQL ✅")
+    except Exception as e:
+        print(f"[DB] Connection Error: {e}")
 
 async def init_db():
     async with pool.acquire() as conn:
