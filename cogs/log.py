@@ -1,20 +1,20 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-from db import set_log_settings, get_log_channel_id, is_log_enabled
+import db  # ← make sure functions are async in db.py
 
 class Logs(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def get_log_channel(self, guild):
-        if not is_log_enabled(guild.id):
+    async def get_log_channel(self, guild):
+        if not await db.is_log_enabled(guild.id):
             return None
-        channel_id = get_log_channel_id(guild.id)
+        channel_id = await db.get_log_channel_id(guild.id)
         return guild.get_channel(channel_id)
 
     async def send_log(self, guild, embed: discord.Embed):
-        channel = self.get_log_channel(guild)
+        channel = await self.get_log_channel(guild)
         if channel:
             try:
                 await channel.send(embed=embed)
@@ -138,7 +138,7 @@ class Logs(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def set_log_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
         try:
-            set_log_settings(interaction.guild.id, channel_id=channel.id)
+            await db.set_log_settings(interaction.guild.id, channel_id=channel.id)
             await interaction.response.send_message(f"✅ Logs will now be posted in {channel.mention}", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"⚠️ Failed to set log channel: `{e}`", ephemeral=True)
@@ -154,7 +154,7 @@ class Logs(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def toggle_logs(self, interaction: discord.Interaction, enabled: bool):
         try:
-            set_log_settings(interaction.guild.id, enabled=enabled)
+            await db.set_log_settings(interaction.guild.id, enabled=enabled)
             status = "enabled" if enabled else "disabled"
             await interaction.response.send_message(f"✅ Logging has been **{status}**.", ephemeral=True)
         except Exception as e:
