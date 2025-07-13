@@ -1,460 +1,416 @@
-import sqlite3
+import asyncpg
+import asyncio
 
-DB_PATH = 'bot.db'
+DB_URL = "postgresql://user:pass@localhost:5432/yourdb"  # ← Replace with your connection string
 
-def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
+pool = None
 
-        c.execute('''
+async def connect_db():
+    global pool
+    pool = await asyncpg.create_pool(DB_URL)
+
+async def init_db():
+    async with pool.acquire() as conn:
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS settings (
-                guild_id INTEGER PRIMARY KEY,
+                guild_id BIGINT PRIMARY KEY,
                 nickname_toggle INTEGER DEFAULT 0,
                 nickname_format TEXT DEFAULT 'User_{username}'
-            )
+            );
         ''')
-
-        c.execute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS automod (
-                guild_id INTEGER PRIMARY KEY,
+                guild_id BIGINT PRIMARY KEY,
                 anti_invite INTEGER DEFAULT 0,
                 anti_link INTEGER DEFAULT 0,
                 anti_spam INTEGER DEFAULT 0
-            )
+            );
         ''')
-
-        c.execute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS pin_messages (
-                guild_id INTEGER,
-                channel_id INTEGER,
+                guild_id BIGINT,
+                channel_id BIGINT,
                 message TEXT,
-                message_id INTEGER,
+                message_id BIGINT,
                 enabled INTEGER DEFAULT 0,
                 PRIMARY KEY (guild_id, channel_id)
-            )
+            );
         ''')
-
-        c.execute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS log_settings (
-                guild_id INTEGER PRIMARY KEY,
-                log_channel_id INTEGER,
+                guild_id BIGINT PRIMARY KEY,
+                log_channel_id BIGINT,
                 log_enabled INTEGER DEFAULT 0
-            )
+            );
         ''')
-
-        c.execute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS chatbot_settings (
-                guild_id INTEGER PRIMARY KEY,
-                channel_id INTEGER
-            )
+                guild_id BIGINT PRIMARY KEY,
+                channel_id BIGINT
+            );
         ''')
-
-        c.execute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS regular_role (
-                guild_id INTEGER PRIMARY KEY,
-                role_id INTEGER,
+                guild_id BIGINT PRIMARY KEY,
+                role_id BIGINT,
                 enabled INTEGER DEFAULT 0
-            )
+            );
         ''')
-
-        c.execute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS count_channels (
-                guild_id INTEGER PRIMARY KEY,
-                channel_id INTEGER
-            )
+                guild_id BIGINT PRIMARY KEY,
+                channel_id BIGINT
+            );
         ''')
-
-        c.execute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS count_progress (
-                guild_id INTEGER PRIMARY KEY,
+                guild_id BIGINT PRIMARY KEY,
                 count INTEGER DEFAULT 0,
-                last_user_id INTEGER
-            )
+                last_user_id BIGINT
+            );
         ''')
-
-        c.execute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS dm_greet_settings (
-                guild_id INTEGER PRIMARY KEY,
+                guild_id BIGINT PRIMARY KEY,
                 enabled INTEGER DEFAULT 0,
                 title TEXT DEFAULT 'Welcome {user}!',
                 description TEXT DEFAULT 'Glad to have you in {server}!',
                 image_url TEXT,
                 footer TEXT
-            )
+            );
         ''')
-
-        c.execute('''
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS welcome_settings (
-                guild_id INTEGER PRIMARY KEY,
-                channel_id INTEGER,
+                guild_id BIGINT PRIMARY KEY,
+                channel_id BIGINT,
                 description TEXT DEFAULT 'Welcome {user} to {server}!',
                 image_url TEXT,
                 big_text TEXT DEFAULT 'Welcome!',
                 small_text TEXT DEFAULT 'Enjoy your stay!',
                 enabled INTEGER DEFAULT 0
-            )
+            );
         ''')
-
-# -------------------- Welcome Settings --------------------
-
-def set_welcome_settings(guild_id, channel_id, bg_url, big_text, small_text, description):
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute('''
-            INSERT INTO welcome_settings (guild_id, channel_id, image_url, big_text, small_text, description, enabled)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
-            ON CONFLICT(guild_id) DO UPDATE SET
-                channel_id = excluded.channel_id,
-                image_url = excluded.image_url,
-                big_text = excluded.big_text,
-                small_text = excluded.small_text,
-                description = excluded.description,
-                enabled = 1
-        ''', (guild_id, channel_id, bg_url, big_text, small_text, description))
-        conn.commit()
-
-def get_welcome_settings(guild_id):
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("SELECT * FROM welcome_settings WHERE guild_id = ?", (guild_id,))
-        row = c.fetchone()
-        if row:
-            return {
-                "guild_id": row[0],
-                "channel_id": row[1],
-                "bg_url": row[2],         # ✅ fixed: image_url is at index 2
-                "big_text": row[3],
-                "small_text": row[4],
-                "description": row[5],    # ✅ fixed: description is at index 5
-                "enabled": bool(row[6])
-            }
-        return None
-
-def toggle_welcome(guild_id):
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("SELECT enabled FROM welcome_settings WHERE guild_id = ?", (guild_id,))
-        row = c.fetchone()
-        if row:
-            new_status = 0 if row[0] else 1
-            c.execute("UPDATE welcome_settings SET enabled = ? WHERE guild_id = ?", (new_status, guild_id))
-            conn.commit()
-            return new_status
-        else:
-            c.execute("INSERT INTO welcome_settings (guild_id, enabled) VALUES (?, 1)", (guild_id,))
-            conn.commit()
-            return 1
 
 # -------------------- Nickname Settings --------------------
 
-def get_nick_setting(guild_id):
+async def get_nick_setting(guild_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT nickname_toggle, nickname_format FROM settings WHERE guild_id = ?', (guild_id,))
-            row = c.fetchone()
-            return row if row else (0, "User_{username}")
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT nickname_toggle, nickname_format FROM settings WHERE guild_id = $1',
+                guild_id
+            )
+            return (row['nickname_toggle'], row['nickname_format']) if row else (0, "User_{username}")
+    except Exception as e:
         print(f"[DB] get_nick_setting error: {e}")
         return (0, "User_{username}")
 
-def set_nick_setting(guild_id, value):
+async def set_nick_setting(guild_id, value):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
+        async with pool.acquire() as conn:
+            await conn.execute('''
                 INSERT INTO settings (guild_id, nickname_toggle)
-                VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET nickname_toggle = excluded.nickname_toggle
-            ''', (guild_id, value))
-    except sqlite3.Error as e:
+                VALUES ($1, $2)
+                ON CONFLICT (guild_id) DO UPDATE SET nickname_toggle = EXCLUDED.nickname_toggle
+            ''', guild_id, value)
+    except Exception as e:
         print(f"[DB] set_nick_setting error: {e}")
 
-def set_nick_format(guild_id, format_str):
+async def set_nick_format(guild_id, format_str):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
+        async with pool.acquire() as conn:
+            await conn.execute('''
                 INSERT INTO settings (guild_id, nickname_format)
-                VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET nickname_format = excluded.nickname_format
-            ''', (guild_id, format_str))
-    except sqlite3.Error as e:
+                VALUES ($1, $2)
+                ON CONFLICT (guild_id) DO UPDATE SET nickname_format = EXCLUDED.nickname_format
+            ''', guild_id, format_str)
+    except Exception as e:
         print(f"[DB] set_nick_format error: {e}")
 
 # -------------------- Pin Messages --------------------
 
-def set_pin_message(guild_id, channel_id, message, message_id, enabled=True):
+async def set_pin_message(guild_id, channel_id, message, message_id, enabled=True):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
+        async with pool.acquire() as conn:
+            await conn.execute('''
                 INSERT INTO pin_messages (guild_id, channel_id, message, message_id, enabled)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(guild_id, channel_id) DO UPDATE
-                SET message = excluded.message,
-                    message_id = excluded.message_id,
-                    enabled = excluded.enabled
-            ''', (guild_id, channel_id, message, message_id, int(enabled)))
-    except sqlite3.Error as e:
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (guild_id, channel_id) DO UPDATE
+                SET message = EXCLUDED.message,
+                    message_id = EXCLUDED.message_id,
+                    enabled = EXCLUDED.enabled
+            ''', guild_id, channel_id, message, message_id, int(enabled))
+    except Exception as e:
         print(f"[DB] set_pin_message error: {e}")
 
-def get_pin_message(guild_id, channel_id):
+async def get_pin_message(guild_id, channel_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT message, message_id FROM pin_messages WHERE guild_id = ? AND channel_id = ?', (guild_id, channel_id))
-            row = c.fetchone()
-            return (row[0], row[1]) if row else (None, None)
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT message, message_id FROM pin_messages WHERE guild_id = $1 AND channel_id = $2',
+                guild_id, channel_id
+            )
+            return (row['message'], row['message_id']) if row else (None, None)
+    except Exception as e:
         print(f"[DB] get_pin_message error: {e}")
         return (None, None)
 
-def set_pin_enabled(guild_id, channel_id, enabled):
+async def set_pin_enabled(guild_id, channel_id, enabled):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
+        async with pool.acquire() as conn:
+            await conn.execute('''
                 INSERT INTO pin_messages (guild_id, channel_id, enabled)
-                VALUES (?, ?, ?)
-                ON CONFLICT(guild_id, channel_id) DO UPDATE
-                SET enabled = excluded.enabled
-            ''', (guild_id, channel_id, int(enabled)))
-    except sqlite3.Error as e:
+                VALUES ($1, $2, $3)
+                ON CONFLICT (guild_id, channel_id) DO UPDATE
+                SET enabled = EXCLUDED.enabled
+            ''', guild_id, channel_id, int(enabled))
+    except Exception as e:
         print(f"[DB] set_pin_enabled error: {e}")
 
-def is_pin_enabled(guild_id, channel_id):
+async def is_pin_enabled(guild_id, channel_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT enabled FROM pin_messages WHERE guild_id = ? AND channel_id = ?', (guild_id, channel_id))
-            row = c.fetchone()
-            return row[0] == 1 if row else False
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT enabled FROM pin_messages WHERE guild_id = $1 AND channel_id = $2',
+                guild_id, channel_id
+            )
+            return row['enabled'] == 1 if row else False
+    except Exception as e:
         print(f"[DB] is_pin_enabled error: {e}")
         return False
 
-def get_full_pin_data(guild_id, channel_id):
+async def get_full_pin_data(guild_id, channel_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT message, message_id, enabled FROM pin_messages WHERE guild_id = ? AND channel_id = ?', (guild_id, channel_id))
-            row = c.fetchone()
-            return row if row else (None, None, False)
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT message, message_id, enabled FROM pin_messages WHERE guild_id = $1 AND channel_id = $2',
+                guild_id, channel_id
+            )
+            return (row['message'], row['message_id'], row['enabled'] == 1) if row else (None, None, False)
+    except Exception as e:
         print(f"[DB] get_full_pin_data error: {e}")
         return (None, None, False)
 
 # -------------------- Logging --------------------
 
-def set_log_settings(guild_id, channel_id=None, enabled=None):
+async def set_log_settings(guild_id, channel_id=None, enabled=None):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
+        async with pool.acquire() as conn:
             if channel_id is not None:
-                c.execute('''
+                await conn.execute('''
                     INSERT INTO log_settings (guild_id, log_channel_id)
-                    VALUES (?, ?)
-                    ON CONFLICT(guild_id) DO UPDATE SET log_channel_id = excluded.log_channel_id
-                ''', (guild_id, channel_id))
+                    VALUES ($1, $2)
+                    ON CONFLICT (guild_id) DO UPDATE
+                    SET log_channel_id = EXCLUDED.log_channel_id
+                ''', guild_id, channel_id)
             if enabled is not None:
-                c.execute('''
+                await conn.execute('''
                     INSERT INTO log_settings (guild_id, log_enabled)
-                    VALUES (?, ?)
-                    ON CONFLICT(guild_id) DO UPDATE SET log_enabled = excluded.log_enabled
-                ''', (guild_id, int(enabled)))
-    except sqlite3.Error as e:
+                    VALUES ($1, $2)
+                    ON CONFLICT (guild_id) DO UPDATE
+                    SET log_enabled = EXCLUDED.log_enabled
+                ''', guild_id, int(enabled))
+    except Exception as e:
         print(f"[DB] set_log_settings error: {e}")
 
-def get_log_channel_id(guild_id):
+async def get_log_channel_id(guild_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT log_channel_id FROM log_settings WHERE guild_id = ?', (guild_id,))
-            row = c.fetchone()
-            return row[0] if row else None
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT log_channel_id FROM log_settings WHERE guild_id = $1',
+                guild_id
+            )
+            return row['log_channel_id'] if row else None
+    except Exception as e:
         print(f"[DB] get_log_channel_id error: {e}")
         return None
 
-def is_log_enabled(guild_id):
+async def is_log_enabled(guild_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT log_enabled FROM log_settings WHERE guild_id = ?', (guild_id,))
-            row = c.fetchone()
-            return row[0] == 1 if row else False
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT log_enabled FROM log_settings WHERE guild_id = $1',
+                guild_id
+            )
+            return row['log_enabled'] == 1 if row else False
+    except Exception as e:
         print(f"[DB] is_log_enabled error: {e}")
         return False
 
 # -------------------- Chatbot --------------------
 
-def set_chatbot_channel(guild_id, channel_id):
+async def set_chatbot_channel(guild_id, channel_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
+        async with pool.acquire() as conn:
+            await conn.execute('''
                 INSERT INTO chatbot_settings (guild_id, channel_id)
-                VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id
-            ''', (guild_id, channel_id))
-    except sqlite3.Error as e:
+                VALUES ($1, $2)
+                ON CONFLICT (guild_id) DO UPDATE SET channel_id = EXCLUDED.channel_id
+            ''', guild_id, channel_id)
+    except Exception as e:
         print(f"[DB] set_chatbot_channel error: {e}")
 
-def get_chatbot_channel(guild_id):
+async def get_chatbot_channel(guild_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT channel_id FROM chatbot_settings WHERE guild_id = ?', (guild_id,))
-            row = c.fetchone()
-            return row[0] if row else None
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT channel_id FROM chatbot_settings WHERE guild_id = $1',
+                guild_id
+            )
+            return row['channel_id'] if row else None
+    except Exception as e:
         print(f"[DB] get_chatbot_channel error: {e}")
         return None
 
-def remove_chatbot_channel(guild_id):
+async def remove_chatbot_channel(guild_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('DELETE FROM chatbot_settings WHERE guild_id = ?', (guild_id,))
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                'DELETE FROM chatbot_settings WHERE guild_id = $1',
+                guild_id
+            )
+    except Exception as e:
         print(f"[DB] remove_chatbot_channel error: {e}")
 
 # -------------------- Regular Role --------------------
 
-def set_regular_role(guild_id, role_id):
+async def set_regular_role(guild_id, role_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
+        async with pool.acquire() as conn:
+            await conn.execute('''
                 INSERT INTO regular_role (guild_id, role_id)
-                VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET role_id = excluded.role_id
-            ''', (guild_id, role_id))
-    except sqlite3.Error as e:
+                VALUES ($1, $2)
+                ON CONFLICT (guild_id) DO UPDATE SET role_id = EXCLUDED.role_id
+            ''', guild_id, role_id)
+    except Exception as e:
         print(f"[DB] set_regular_role error: {e}")
 
-def toggle_regular_role(guild_id, enabled):
+async def toggle_regular_role(guild_id, enabled):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
+        async with pool.acquire() as conn:
+            await conn.execute('''
                 INSERT INTO regular_role (guild_id, enabled)
-                VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET enabled = excluded.enabled
-            ''', (guild_id, int(enabled)))
-    except sqlite3.Error as e:
+                VALUES ($1, $2)
+                ON CONFLICT (guild_id) DO UPDATE SET enabled = EXCLUDED.enabled
+            ''', guild_id, int(enabled))
+    except Exception as e:
         print(f"[DB] toggle_regular_role error: {e}")
 
-def get_regular_role_settings(guild_id):
+async def get_regular_role_settings(guild_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT role_id, enabled FROM regular_role WHERE guild_id = ?', (guild_id,))
-            row = c.fetchone()
-            return row if row else (None, 0)
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT role_id, enabled FROM regular_role WHERE guild_id = $1',
+                guild_id
+            )
+            return (row['role_id'], row['enabled']) if row else (None, 0)
+    except Exception as e:
         print(f"[DB] get_regular_role_settings error: {e}")
         return (None, 0)
 
 # -------------------- Counting -----------------
 
-def set_count_channel(guild_id: int, channel_id: int):
+async def set_count_channel(guild_id: int, channel_id: int):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
+        async with pool.acquire() as conn:
+            await conn.execute('''
                 INSERT INTO count_channels (guild_id, channel_id)
-                VALUES (?, ?)
-                ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id
-            ''', (guild_id, channel_id))
-    except sqlite3.Error as e:
+                VALUES ($1, $2)
+                ON CONFLICT (guild_id) DO UPDATE SET channel_id = EXCLUDED.channel_id
+            ''', guild_id, channel_id)
+    except Exception as e:
         print(f"[DB] set_count_channel error: {e}")
 
-def get_count_channel(guild_id: int):
+async def get_count_channel(guild_id: int):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute("SELECT channel_id FROM count_channels WHERE guild_id = ?", (guild_id,))
-            row = c.fetchone()
-            return row[0] if row else None
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT channel_id FROM count_channels WHERE guild_id = $1',
+                guild_id
+            )
+            return row['channel_id'] if row else None
+    except Exception as e:
         print(f"[DB] get_count_channel error: {e}")
         return None
 
-def remove_count_channel(guild_id: int):
+async def remove_count_channel(guild_id: int):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute("DELETE FROM count_channels WHERE guild_id = ?", (guild_id,))
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                'DELETE FROM count_channels WHERE guild_id = $1',
+                guild_id
+            )
+    except Exception as e:
         print(f"[DB] remove_count_channel error: {e}")
 
-def get_current_count(guild_id: int):
+async def get_current_count(guild_id: int):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute("SELECT count FROM count_progress WHERE guild_id = ?", (guild_id,))
-            row = c.fetchone()
-            return row[0] if row else 0
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT count FROM count_progress WHERE guild_id = $1',
+                guild_id
+            )
+            return row['count'] if row else 0
+    except Exception as e:
         print(f"[DB] get_current_count error: {e}")
         return 0
 
-def get_last_counter(guild_id: int):
+async def get_last_counter(guild_id: int):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute("SELECT last_user_id FROM count_progress WHERE guild_id = ?", (guild_id,))
-            row = c.fetchone()
-            return row[0] if row else None
-    except sqlite3.Error as e:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                'SELECT last_user_id FROM count_progress WHERE guild_id = $1',
+                guild_id
+            )
+            return row['last_user_id'] if row else None
+    except Exception as e:
         print(f"[DB] get_last_counter error: {e}")
         return None
 
-def update_count(guild_id: int, new_count: int, user_id: int):
+async def update_count(guild_id: int, new_count: int, user_id: int):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
+        async with pool.acquire() as conn:
+            await conn.execute('''
                 INSERT INTO count_progress (guild_id, count, last_user_id)
-                VALUES (?, ?, ?)
-                ON CONFLICT(guild_id) DO UPDATE
-                SET count = excluded.count, last_user_id = excluded.last_user_id
-            ''', (guild_id, new_count, user_id))
-    except sqlite3.Error as e:
+                VALUES ($1, $2, $3)
+                ON CONFLICT (guild_id) DO UPDATE
+                SET count = EXCLUDED.count, last_user_id = EXCLUDED.last_user_id
+            ''', guild_id, new_count, user_id)
+    except Exception as e:
         print(f"[DB] update_count error: {e}")
 
-def reset_count(guild_id: int):
+async def reset_count(guild_id: int):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('''
+        async with pool.acquire() as conn:
+            await conn.execute('''
                 INSERT INTO count_progress (guild_id, count, last_user_id)
-                VALUES (?, 0, NULL)
-                ON CONFLICT(guild_id) DO UPDATE
+                VALUES ($1, 0, NULL)
+                ON CONFLICT (guild_id) DO UPDATE
                 SET count = 0, last_user_id = NULL
-            ''', (guild_id,))
-    except sqlite3.Error as e:
+            ''', guild_id)
+    except Exception as e:
         print(f"[DB] reset_count error: {e}")
-        
-        # -------------------- DM Greet Settings --------------------
 
-def get_dm_greet_settings(guild_id):
+# -------------------- DM Greet Settings --------------------
+
+async def get_dm_greet_settings(guild_id):
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
-            c.execute('SELECT enabled, title, description, image_url, footer FROM dm_greet_settings WHERE guild_id = ?', (guild_id,))
-            row = c.fetchone()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow('''
+                SELECT enabled, title, description, image_url, footer
+                FROM dm_greet_settings
+                WHERE guild_id = $1
+            ''', guild_id)
+
             if row:
                 return {
-                    'enabled': bool(row[0]),
-                    'title': row[1],
-                    'description': row[2],
-                    'image_url': row[3],
-                    'footer': row[4]
+                    'enabled': bool(row['enabled']),
+                    'title': row['title'],
+                    'description': row['description'],
+                    'image_url': row['image_url'],
+                    'footer': row['footer']
                 }
+
             return {
                 'enabled': False,
                 'title': 'Welcome {user}!',
@@ -462,31 +418,47 @@ def get_dm_greet_settings(guild_id):
                 'image_url': None,
                 'footer': None
             }
-    except sqlite3.Error as e:
+
+    except Exception as e:
         print(f"[DB] get_dm_greet_settings error: {e}")
         return None
 
-def set_dm_greet_settings(guild_id, enabled=None, title=None, description=None, image_url=None, footer=None):
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            c = conn.cursor()
 
-            # Ensure a row exists
-            c.execute('''
-                INSERT OR IGNORE INTO dm_greet_settings (guild_id) VALUES (?)
-            ''', (guild_id,))
+async def set_dm_greet_settings(guild_id, enabled=None, title=None, description=None, image_url=None, footer=None):
+    try:
+        async with pool.acquire() as conn:
+            # Ensure row exists
+            await conn.execute('''
+                INSERT INTO dm_greet_settings (guild_id)
+                VALUES ($1)
+                ON CONFLICT (guild_id) DO NOTHING
+            ''', guild_id)
 
             if enabled is not None:
-                c.execute('UPDATE dm_greet_settings SET enabled = ? WHERE guild_id = ?', (int(enabled), guild_id))
+                await conn.execute('''
+                    UPDATE dm_greet_settings SET enabled = $1 WHERE guild_id = $2
+                ''', int(enabled), guild_id)
+
             if title is not None:
-                c.execute('UPDATE dm_greet_settings SET title = ? WHERE guild_id = ?', (title, guild_id))
+                await conn.execute('''
+                    UPDATE dm_greet_settings SET title = $1 WHERE guild_id = $2
+                ''', title, guild_id)
+
             if description is not None:
-                c.execute('UPDATE dm_greet_settings SET description = ? WHERE guild_id = ?', (description, guild_id))
+                await conn.execute('''
+                    UPDATE dm_greet_settings SET description = $1 WHERE guild_id = $2
+                ''', description, guild_id)
+
             if image_url is not None:
-                c.execute('UPDATE dm_greet_settings SET image_url = ? WHERE guild_id = ?', (image_url, guild_id))
+                await conn.execute('''
+                    UPDATE dm_greet_settings SET image_url = $1 WHERE guild_id = $2
+                ''', image_url, guild_id)
+
             if footer is not None:
-                c.execute('UPDATE dm_greet_settings SET footer = ? WHERE guild_id = ?', (footer, guild_id))
-    except sqlite3.Error as e:
+                await conn.execute('''
+                    UPDATE dm_greet_settings SET footer = $1 WHERE guild_id = $2
+                ''', footer, guild_id)
+
+    except Exception as e:
         print(f"[DB] set_dm_greet_settings error: {e}")
 
-        
