@@ -1,25 +1,7 @@
-# M.I.T.A - Discord Bot Project
-# Copyright (C) 2025 M.I.T.A Bot Team
-#
-# This file is part of M.I.T.A.
-#
-# M.I.T.A is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# M.I.T.A is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 import discord
 from discord.ext import commands
 from discord import app_commands
-from db import get_pin_message, set_pin_message, set_pin_enabled, is_pin_enabled
+import db  # <- make sure your db.py uses asyncpg
 import time
 
 class PersistentPin(commands.Cog):
@@ -39,7 +21,7 @@ class PersistentPin(commands.Cog):
         channel_id = channel.id
 
         try:
-            _, old_id = get_pin_message(guild_id, channel_id)
+            _, old_id = await db.get_pin_message(guild_id, channel_id)
             if old_id:
                 try:
                     old_msg = await channel.fetch_message(old_id)
@@ -49,8 +31,8 @@ class PersistentPin(commands.Cog):
 
             new_msg = await channel.send(f"**{message}**")
             self.cache[channel_id] = new_msg.id
-            set_pin_message(guild_id, channel_id, message, new_msg.id)
-            set_pin_enabled(guild_id, channel_id, True)
+            await db.set_pin_message(guild_id, channel_id, message, new_msg.id)
+            await db.set_pin_enabled(guild_id, channel_id, True)
 
             await interaction.followup.send("Bottom-pinned message set and enabled.", ephemeral=True)
 
@@ -78,7 +60,7 @@ class PersistentPin(commands.Cog):
             channel_id = interaction.channel.id
             enable = state.value == "enable"
 
-            set_pin_enabled(guild_id, channel_id, enable)
+            await db.set_pin_enabled(guild_id, channel_id, enable)
             await interaction.followup.send(
                 f"Bottom message has been {'enabled' if enable else 'disabled'} for this channel.",
                 ephemeral=True
@@ -98,7 +80,7 @@ class PersistentPin(commands.Cog):
         guild_id = message.guild.id
         channel_id = message.channel.id
 
-        if not is_pin_enabled(guild_id, channel_id):
+        if not await db.is_pin_enabled(guild_id, channel_id):
             return
 
         now = time.time()
@@ -107,7 +89,7 @@ class PersistentPin(commands.Cog):
             return
         self.cooldowns[channel_id] = now
 
-        message_text, old_id = get_pin_message(guild_id, channel_id)
+        message_text, old_id = await db.get_pin_message(guild_id, channel_id)
         if not message_text:
             return
 
@@ -121,7 +103,7 @@ class PersistentPin(commands.Cog):
 
             new_msg = await message.channel.send(f"**{message_text}**")
             self.cache[channel_id] = new_msg.id
-            set_pin_message(guild_id, channel_id, message_text, new_msg.id)
+            await db.set_pin_message(guild_id, channel_id, message_text, new_msg.id)
         except Exception as e:
             print(f"[PersistentPin] Error keeping message at bottom: {e}")
 
