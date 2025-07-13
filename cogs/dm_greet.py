@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import db
+import db  # Ensure all db functions here are async
 
 PLACEHOLDERS = {
     "{user}": lambda m: m.mention,
@@ -21,7 +21,7 @@ class DmGreet(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
-        settings = db.get_dm_greet_settings(member.guild.id)
+        settings = await db.get_dm_greet_settings(member.guild.id)
         if not settings or not settings["enabled"]:
             return
 
@@ -66,13 +66,13 @@ class DMGreetGroup(app_commands.Group):
     @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.command(name="enable", description="Enable welcome DMs")
     async def enable(self, interaction: discord.Interaction):
-        db.set_dm_greet_settings(interaction.guild_id, enabled=True)
+        await db.set_dm_greet_settings(interaction.guild_id, enabled=True)
         await interaction.response.send_message("DM greeting enabled!", ephemeral=True)
 
     @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.command(name="disable", description="Disable welcome DMs")
     async def disable(self, interaction: discord.Interaction):
-        db.set_dm_greet_settings(interaction.guild_id, enabled=False)
+        await db.set_dm_greet_settings(interaction.guild_id, enabled=False)
         await interaction.response.send_message("DM greeting disabled.", ephemeral=True)
 
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -91,7 +91,7 @@ class DMGreetGroup(app_commands.Group):
         image_url: str = None,
         footer: str = None
     ):
-        db.set_dm_greet_settings(
+        await db.set_dm_greet_settings(
             interaction.guild_id,
             title=title,
             description=description,
@@ -103,7 +103,7 @@ class DMGreetGroup(app_commands.Group):
     @app_commands.checks.has_permissions(manage_guild=True)
     @app_commands.command(name="view", description="Show current DM greeting settings")
     async def view(self, interaction: discord.Interaction):
-        settings = db.get_dm_greet_settings(interaction.guild_id)
+        settings = await db.get_dm_greet_settings(interaction.guild_id)
         if not settings:
             await interaction.response.send_message("No settings found.", ephemeral=True)
             return
