@@ -1,5 +1,3 @@
-# cogs/counting.py
-
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -29,8 +27,8 @@ class Counting(commands.Cog):
             await interaction.response.send_message("You need to be an administrator to use this command.", ephemeral=True)
             return
 
-        set_count_channel(interaction.guild.id, channel.id)
-        reset_count(interaction.guild.id)
+        await set_count_channel(interaction.guild.id, channel.id)
+        await reset_count(interaction.guild.id)
         await interaction.response.send_message(f"✅ Counting channel set to {channel.mention} and counter reset!", ephemeral=True)
 
     @count_group.command(name="remove")
@@ -39,8 +37,8 @@ class Counting(commands.Cog):
             await interaction.response.send_message("You need to be an administrator to use this command.", ephemeral=True)
             return
 
-        remove_count_channel(interaction.guild.id)
-        reset_count(interaction.guild.id)
+        await remove_count_channel(interaction.guild.id)
+        await reset_count(interaction.guild.id)
         await interaction.response.send_message("🗑️ Counting channel removed and count reset!", ephemeral=True)
 
     @commands.Cog.listener()
@@ -48,7 +46,7 @@ class Counting(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        channel_id = get_count_channel(message.guild.id)
+        channel_id = await get_count_channel(message.guild.id)
         if not channel_id or message.channel.id != channel_id:
             return
 
@@ -58,9 +56,9 @@ class Counting(commands.Cog):
             await message.delete()
             return
 
-        current = get_current_count(message.guild.id)
+        current = await get_current_count(message.guild.id)
         expected = current + 1
-        last_user = get_last_counter(message.guild.id)
+        last_user = await get_last_counter(message.guild.id)
 
         if count != expected:
             await message.delete()
@@ -70,7 +68,7 @@ class Counting(commands.Cog):
             await message.delete()
             return
 
-        update_count(message.guild.id, expected, message.author.id)
+        await update_count(message.guild.id, expected, message.author.id)
         await message.add_reaction("✅")
 
 async def setup(bot):
