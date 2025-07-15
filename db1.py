@@ -1,7 +1,7 @@
 import asyncpg
 import asyncio
 
-DB_URL = "postgresql://neondb_owner:npg_js0uh9UaBJIV@ep-morning-smoke-a1e53vfz-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+DB_URL = ""
 
 pool = None
 
