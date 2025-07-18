@@ -2,9 +2,13 @@ import discord
 from discord.ext import commands
 import asyncio
 import os
-from db import connect_db, init_db  # Connect pool and initialize tables
+from db import connect_db, init_db
+from dotenv import load_dotenv
 
-# Bot intents
+load_dotenv()
+TOKEN = os.getenv("BOT_TOKEN")  # Secure your token in .env
+
+# Setup intents
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
@@ -12,65 +16,62 @@ intents.members = True
 intents.voice_states = True
 intents.bans = True
 
-# Create the bot
+# Create bot instance
 bot = commands.Bot(command_prefix=None, intents=intents)
 
-# When the bot joins a new guild
-@bot.event
-async def on_guild_join(guild: discord.Guild):
-    embed = discord.Embed(
-        title="<:kirtikaze_impressed:1360665116399636650> Thanks for adding me!",
-        description=(
-            "<:kirtikaze_hii:1360664781761151196> I'm **M.I.T.A** – I Have Many Useful Features That Many Bots Doesn't Have. \n\n"
-            "<a:arr:1371326929042407435> Use `/help` to explore my features.\n"
-            "<a:arr:1371326929042407435> I Can Talk To You ! Just Type ``/set_channel`` And I Am Ready \n\n"
-            "**Less Gooo !**"
-        ),
-        color=discord.Color.blurple()
-    )
-    embed.set_footer(text="(⁠☞⁠^⁠o⁠^⁠)⁠ ⁠☞ Made With ❤️ By Kirtikaze Team")
-
-    # Try system channel first
-    if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
-        await guild.system_channel.send(embed=embed)
-    else:
-        # Fallback: first text channel where bot can send messages
-        for channel in guild.text_channels:
-            if channel.permissions_for(guild.me).send_messages:
-                await channel.send(embed=embed)
-                break
-
-# When the bot is ready
 @bot.event
 async def on_ready():
     await bot.change_presence(
         status=discord.Status.idle,
         activity=discord.Game("「 M.I.T.A For You ❤️ 」")
     )
-    print(f"Logged in as {bot.user}")
+    print(f"✅ Logged in as {bot.user} ({bot.user.id})")
+
     try:
         synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} slash commands.")
+        print(f"✅ Synced {len(synced)} slash commands.")
     except Exception as e:
-        print(f"Failed to sync commands: {e}")
+        print(f"❌ Slash command sync failed: {e}")
 
-# Load all cogs from the /cogs folder
+@bot.event
+async def on_guild_join(guild: discord.Guild):
+    embed = discord.Embed(
+        title="Thanks for adding me! 🌟",
+        description=(
+            "I'm M.I.T.A – your multi-purpose companion bot! 🎉\n\n"
+            "▶ Use `/help` to explore features.\n"
+            "▶ Want chat? Use `/set_channel`.\n\n"
+            "Let’s grow your server together!"
+        ),
+        color=discord.Color.blurple()
+    )
+    embed.set_footer(text="Made With ❤️ By Kirtikaze Team")
+
+    if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
+        await guild.system_channel.send(embed=embed)
+    else:
+        for channel in guild.text_channels:
+            if channel.permissions_for(guild.me).send_messages:
+                await channel.send(embed=embed)
+                break
+
+# Load cogs from /cogs folder
 async def load_cogs():
     for filename in os.listdir('./cogs'):
-        if filename.endswith('.py'):
+        if filename.endswith('.py') and not filename.startswith('_'):
             try:
                 await bot.load_extension(f'cogs.{filename[:-3]}')
-                print(f"Loaded cog: {filename}")
+                print(f"✅ Loaded cog: {filename}")
             except Exception as e:
-                print(f"Failed to load {filename}: {e}")
+                print(f"❌ Failed to load cog {filename}: {e}")
 
-# Main function to start the bot
+# Start the bot
 async def main():
-    await connect_db()     # Connect PostgreSQL pool
-    await init_db()        # Create tables
+    await connect_db()
+    await init_db()
     async with bot:
         await load_cogs()
-        await bot.start("majduri_ka_token")  # Replace with your real token
+        await bot.start(TOKEN)
 
-# Run the bot
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
