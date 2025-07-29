@@ -95,23 +95,10 @@ async def init_db():
             );
         ''')
         await conn.execute('''
-            CREATE TABLE IF NOT EXISTS follow_settings (
-                guild_id BIGINT,
+             CREATE TABLE IF NOT EXISTS image_settings (
+                guild_id BIGINT PRIMARY KEY,
                 channel_id BIGINT,
-                platform TEXT,
-                link TEXT,
-                custom_message TEXT,
-                is_enabled BOOLEAN DEFAULT TRUE,
-                PRIMARY KEY (guild_id, platform)
-            );
-        ''')
-
-        await conn.execute('''
-            CREATE TABLE IF NOT EXISTS follow_latest (
-                guild_id BIGINT,
-                platform TEXT,
-                last_post_id TEXT,
-                PRIMARY KEY (guild_id, platform)
+                category TEXT
             );
         ''')
 
@@ -415,6 +402,34 @@ async def reset_count(guild_id: int):
     except Exception as e:
         print(f"[DB] reset_count error: {e}")
 
+        # ----- image loop -----
+async def set_image_setting(self, guild_id: int, channel_id: int, category: str):
+    await self.pool.execute('''
+        INSERT INTO image_settings (guild_id, channel_id, category)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (guild_id) DO UPDATE
+        SET channel_id = EXCLUDED.channel_id,
+            category = EXCLUDED.category;
+    ''', guild_id, channel_id, category)
+
+async def get_image_setting(self, guild_id: int):
+    row = await self.pool.fetchrow('''
+        SELECT channel_id, category FROM image_settings
+        WHERE guild_id = $1
+    ''', guild_id)
+    return dict(row) if row else None
+
+async def clear_image_setting(self, guild_id: int):
+    await self.pool.execute('''
+        DELETE FROM image_settings WHERE guild_id = $1
+    ''', guild_id)
+
+async def get_all_image_settings(self):
+    rows = await self.pool.fetch('''
+        SELECT guild_id, channel_id, category FROM image_settings
+    ''')
+    return [dict(row) for row in rows]
+
 # -------------------- DM Greet Settings --------------------
 
 async def get_dm_greet_settings(guild_id):
@@ -485,73 +500,3 @@ async def set_dm_greet_settings(guild_id, enabled=None, title=None, description=
 
     except Exception as e:
         print(f"[DB] set_dm_greet_settings error: {e}")
-        
-        # -------------------- Follow Settings --------------------
-
-async def add_follow_entry(guild_id, channel_id, platform, link, message):
-    try:
-        async with pool.acquire() as conn:
-            await conn.execute('''
-                INSERT INTO follow_settings (guild_id, channel_id, platform, link, custom_message, is_enabled)
-                VALUES ($1, $2, $3, $4, $5, TRUE)
-                ON CONFLICT (guild_id, platform) DO UPDATE
-                SET channel_id = EXCLUDED.channel_id,
-                    link = EXCLUDED.link,
-                    custom_message = EXCLUDED.custom_message,
-                    is_enabled = TRUE
-            ''', guild_id, channel_id, platform, link, message)
-    except Exception as e:
-        print(f"[DB] add_follow_entry error: {e}")
-
-
-async def set_follow_toggle(guild_id, enabled: bool):
-    try:
-        async with pool.acquire() as conn:
-            await conn.execute('''
-                UPDATE follow_settings
-                SET is_enabled = $1
-                WHERE guild_id = $2
-            ''', enabled, guild_id)
-    except Exception as e:
-        print(f"[DB] set_follow_toggle error: {e}")
-
-
-async def get_all_active_follows():
-    try:
-        async with pool.acquire() as conn:
-            rows = await conn.fetch('''
-                SELECT guild_id, channel_id, platform, link, custom_message
-                FROM follow_settings
-                WHERE is_enabled = TRUE
-            ''')
-            return rows
-    except Exception as e:
-        print(f"[DB] get_all_active_follows error: {e}")
-        return []
-
-
-async def get_last_video_id(guild_id, platform):
-    try:
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow('''
-                SELECT last_post_id
-                FROM follow_latest
-                WHERE guild_id = $1 AND platform = $2
-            ''', guild_id, platform)
-            return row['last_post_id'] if row else None
-    except Exception as e:
-        print(f"[DB] get_last_video_id error: {e}")
-        return None
-
-
-async def set_last_video_id(guild_id, platform, post_id):
-    try:
-        async with pool.acquire() as conn:
-            await conn.execute('''
-                INSERT INTO follow_latest (guild_id, platform, last_post_id)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (guild_id, platform) DO UPDATE
-                SET last_post_id = EXCLUDED.last_post_id
-            ''', guild_id, platform, post_id)
-    except Exception as e:
-        print(f"[DB] set_last_video_id error: {e}")
