@@ -4,83 +4,76 @@ from discord import app_commands
 import random
 import aiohttp
 
-valid_categories = ["boy", "girl", "cat", "dog", "aesthetic", "anime"]
+from db import set_image_setting, get_image_setting, clear_image_setting, get_all_image_settings
 
-class ImageLooper(commands.Cog):
+class ImageLoop(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.active_settings = {}  # guild_id -> {"channel_id": ..., "category": ...}
         self.image_loop.start()
+        self.valid_categories = ["boy", "girl", "cat", "dog", "aesthetic", "anime"]
 
-    async def cog_load(self):
-        # Load settings from DB
-        rows = await self.bot.db.get_all_image_settings()
-        for row in rows:
-            self.active_settings[row["guild_id"]] = {
-                "channel_id": row["channel_id"],
-                "category": row["category"]
-            }
-
-    def cog_unload(self):
-        self.image_loop.cancel()
-
-    @app_commands.command(name="image-post", description="Set or toggle image posting")
-    @app_commands.describe(option="Type a category (boy/girl/cat...) or 'on'/'off'")
-    async def image_post(self, interaction: discord.Interaction, option: str):
-        if not interaction.user.guild_permissions.administrator:
-            return await interaction.response.send_message("❌ You must be an admin to use this.", ephemeral=True)
-
-        option = option.lower()
+    @app_commands.command(name="image-post", description="Set or control auto image posting")
+    @app_commands.describe(mode="Choose a category or turn on/off image posting")
+    async def image_post(self, interaction: discord.Interaction, mode: str):
         guild_id = interaction.guild.id
+        channel_id = interaction.channel.id
 
-        if option in valid_categories:
-            await self.bot.db.set_image_setting(guild_id, interaction.channel.id, option)
-            self.active_settings[guild_id] = {"channel_id": interaction.channel.id, "category": option}
-            await interaction.response.send_message(f"✅ Category set to `{option}`. Use `/image-post on` to start.")
-        
-        elif option == "on":
-            setting = await self.bot.db.get_image_setting(guild_id)
-            if not setting:
-                return await interaction.response.send_message("❌ Set a category first using `/image-post <category>`.", ephemeral=True)
+        if mode.lower() == "off":
+            await clear_image_setting(guild_id)
+            await interaction.response.send_message("✅ Image posting disabled.", ephemeral=True)
+            return
 
-            self.active_settings[guild_id] = {
-                "channel_id": setting["channel_id"],
-                "category": setting["category"]
-            }
-            await interaction.response.send_message(f"🟢 Started posting `{setting['category']}` images every 15 mins.")
-        
-        elif option == "off":
-            await self.bot.db.clear_image_setting(guild_id)
-            self.active_settings.pop(guild_id, None)
-            await interaction.response.send_message("🛑 Image posting stopped.")
-        
-        else:
-            await interaction.response.send_message("❌ Invalid input. Use a category or `on`/`off`.", ephemeral=True)
+        if mode.lower() == "on":
+            setting = await get_image_setting(guild_id)
+            if setting:
+                await interaction.response.send_message("✅ Image posting enabled.", ephemeral=True)
+            else:
+                await interaction.response.send_message("❌ No category set. Please run `/image-post <category>` first.", ephemeral=True)
+            return
+
+        category = mode.lower()
+        if category not in self.valid_categories:
+            await interaction.response.send_message(
+                f"❌ Invalid category. Choose from: {', '.join(self.valid_categories)}", ephemeral=True
+            )
+            return
+
+        await set_image_setting(guild_id, channel_id, category)
+        await interaction.response.send_message(f"✅ Category set to **{category}** and image posting is now active.", ephemeral=True)
 
     @tasks.loop(minutes=15)
     async def image_loop(self):
-        for guild_id, setting in self.active_settings.items():
+        settings = await get_all_image_settings()
+        for setting in settings:
             try:
-                channel = self.bot.get_channel(setting["channel_id"])
-                if channel:
-                    url = await self.fetch_image(setting["category"])
-                    embed = discord.Embed(title=f"Here's a random {setting['category']} image!")
-                    embed.set_image(url=url)
-                    await channel.send(embed=embed)
-            except Exception as e:
-                print(f"[image_loop] Error in guild {guild_id}: {e}")
+                guild = self.bot.get_guild(setting["guild_id"])
+                if not guild:
+                    continue
 
-    async def fetch_image(self, category: str) -> str:
-        if category == "cat":
+                channel = guild.get_channel(setting["channel_id"])
+                if not channel:
+                    continue
+
+                image_url = await self.fetch_random_image(setting["category"])
+                if image_url:
+                    await channel.send(image_url)
+            except Exception as e:
+                print(f"[ImageLoop] Error posting image: {e}")
+
+    async def fetch_random_image(self, category):
+        try:
             async with aiohttp.ClientSession() as session:
-                async with session.get("https://some-random-api.ml/img/cat") as r:
-                    return (await r.json())["link"]
-        elif category == "dog":
-            async with aiohttp.ClientSession() as session:
-                async with session.get("https://some-random-api.ml/img/dog") as r:
-                    return (await r.json())["link"]
-        else:
-            return f"https://source.unsplash.com/600x400/?{category}"
+                async with session.get(f"https://api.waifu.pics/sfw/{category}") as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        return data.get("url")
+        except Exception as e:
+            print(f"[ImageLoop] Failed to fetch image: {e}")
+        return None
+
+    @image_loop.before_loop
+    async def before_image_loop(self):
+        await self.bot.wait_until_ready()
 
 async def setup(bot):
-    await bot.add_cog(ImageLooper(bot))
+    await bot.add_cog(ImageLoop(bot))
