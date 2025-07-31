@@ -500,3 +500,52 @@ async def set_dm_greet_settings(guild_id, enabled=None, title=None, description=
 
     except Exception as e:
         print(f"[DB] set_dm_greet_settings error: {e}")
+
+        # -------------------- Image Settings --------------------
+
+# Set or update the image posting settings for a guild
+async def set_image_setting(guild_id: int, channel_id: int, category: str):
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute('''
+                INSERT INTO image_settings (guild_id, channel_id, category)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (guild_id)
+                DO UPDATE SET 
+                    channel_id = EXCLUDED.channel_id,
+                    category = EXCLUDED.category
+            ''', guild_id, channel_id, category)
+    except Exception as e:
+        print(f"[DB] set_image_setting error: {e}")
+
+# Get the image posting settings for a specific guild
+async def get_image_setting(guild_id: int):
+    try:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow('''
+                SELECT channel_id, category 
+                FROM image_settings
+                WHERE guild_id = $1
+            ''', guild_id)
+            return {"channel_id": row["channel_id"], "category": row["category"]} if row else None
+    except Exception as e:
+        print(f"[DB] get_image_setting error: {e}")
+        return None
+
+# Get settings for all guilds (useful for background loops)
+async def get_all_image_settings():
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch('SELECT guild_id, channel_id, category FROM image_settings')
+            return [dict(row) for row in rows]
+    except Exception as e:
+        print(f"[DB] get_all_image_settings error: {e}")
+        return []
+
+# Clear the image posting settings for a guild
+async def clear_image_setting(guild_id: int):
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute('DELETE FROM image_settings WHERE guild_id = $1', guild_id)
+    except Exception as e:
+        print(f"[DB] clear_image_setting error: {e}")
